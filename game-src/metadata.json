@@ -1,0 +1,6 @@
+{
+  "name": "CAPTCHA: Delivery Status Retrieval",
+  "description": "An action-arcade survival game where an everyday user uses an overclocked smartphone against spam-bots, glitch traffic, and the 'I Am Not A Robot' Core to check an urgent package delivery.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

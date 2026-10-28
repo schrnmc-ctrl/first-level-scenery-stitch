@@ -1,0 +1,2 @@
+- [x] Apply the supplied background exclusively to Level 2 with static scenery, readable gameplay, and matching object boundaries.
+- [x] Verify Level 1 remains unchanged and Level 2 is playable; provide the updated game ZIP. Level 2 checked directly in live gameplay; normal Level 1 progression was not completed during testing.
