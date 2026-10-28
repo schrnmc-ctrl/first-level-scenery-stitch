@@ -1,2 +1,4 @@
 - [x] Apply the supplied background exclusively to Level 2 with static scenery, readable gameplay, and matching object boundaries.
 - [x] Verify Level 1 remains unchanged and Level 2 is playable; provide the updated game ZIP. Level 2 checked directly in live gameplay; normal Level 1 progression was not completed during testing.
+- [ ] Replace Level 1 and Level 2 scenery and add the supplied Level 3 scenery exclusively to Level 3.
+- [ ] Align scenery boundaries and verify each level renders its own image without changing other stages.
