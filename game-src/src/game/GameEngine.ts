@@ -14,6 +14,7 @@ import {
   GameSettings,
 } from '../types';
 import { isL1Blocked } from './level1Collision';
+import { isL2Blocked, level2GateCenter, LEVEL2_STAGE } from './level2Map';
 import {
 
   CANVAS_WIDTH,
@@ -269,6 +270,13 @@ export class GameEngine {
     this.projectiles = [];
     this.captchaZones = [];
 
+    if (stageId === LEVEL2_STAGE) {
+      this.player.x = 120;
+      this.player.y = WORLD_HEIGHT - 140;
+      this.camera.x = 0;
+      this.camera.y = WORLD_HEIGHT - CANVAS_HEIGHT;
+    }
+
     if (stageId !== 'STAGE_BOSS') {
       this.spawnCaptchaZone();
       this.spawnCaptchaZone();
@@ -388,15 +396,16 @@ export class GameEngine {
     const nextX = p.x + p.vx * dt;
     const nextY = p.y + p.vy * dt;
 
-    if (this.stage === 'STAGE_1_CROSSWALK') {
+    if (this.stage === 'STAGE_1_CROSSWALK' || this.stage === LEVEL2_STAGE) {
       // Collide with background objects (path and solid ground stay walkable).
       // Axis-separated checks let the player slide along obstacles.
       const r = Math.max(p.width, p.height) / 2;
+      const isBlocked = this.stage === LEVEL2_STAGE ? isL2Blocked : isL1Blocked;
       const blocked = (x: number, y: number) =>
-        isL1Blocked(x - r, y - r) ||
-        isL1Blocked(x + r, y - r) ||
-        isL1Blocked(x - r, y + r) ||
-        isL1Blocked(x + r, y + r);
+        isBlocked(x - r, y - r) ||
+        isBlocked(x + r, y - r) ||
+        isBlocked(x - r, y + r) ||
+        isBlocked(x + r, y + r);
       if (!blocked(nextX, p.y)) p.x = nextX;
       if (!blocked(p.x, nextY)) p.y = nextY;
     } else {
@@ -735,6 +744,12 @@ export class GameEngine {
 
     let zx = 140 + t * (WORLD_WIDTH - 380) + jitterX;
     let zy = WORLD_HEIGHT - 180 - t * (WORLD_HEIGHT - 400) + jitterY;
+
+    if (this.stage === LEVEL2_STAGE) {
+      const center = level2GateCenter(this.captchaZones.length);
+      zx = center.x - 75;
+      zy = center.y - 32.5;
+    }
 
     // On Level 1, snap the zone onto walkable ground (off background objects)
     if (this.stage === 'STAGE_1_CROSSWALK') {

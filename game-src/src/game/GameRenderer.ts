@@ -1,5 +1,7 @@
 import { Player, Enemy, Boss, Projectile, Particle, PowerUp, Shockwave, CaptchaZone, GameSettings } from '../types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, easeInOutSine } from './constants';
+import level2Asset from '../assets/level2-bg.jpg.asset.json';
+import { hasImageBackground, LEVEL2_STAGE } from './level2Map';
 
 export class GameRenderer {
   private ctx: CanvasRenderingContext2D;
@@ -7,6 +9,8 @@ export class GameRenderer {
   public stage: string = '';
   private stage1Bg: HTMLImageElement;
   private stage1BgReady: boolean = false;
+  private stage2Bg: HTMLImageElement;
+  private stage2BgReady: boolean = false;
 
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
@@ -15,6 +19,9 @@ export class GameRenderer {
       this.stage1BgReady = true;
     };
     this.stage1Bg.src = `${import.meta.env.BASE_URL}level1-bg.png`;
+    this.stage2Bg = new Image();
+    this.stage2Bg.onload = () => { this.stage2BgReady = true; };
+    this.stage2Bg.src = level2Asset.url;
   }
 
   public render(
@@ -56,15 +63,15 @@ export class GameRenderer {
       // 1. Subtle Motion Blur & Canvas Clear
       this.clearCanvas(motionBlur);
 
-      // 1b. Level 1 Parallax Background (Screen Space, behind the world)
-      this.renderStage1Parallax(camera);
+      // Static image scenery, exclusive to its own level.
+      this.renderStageBackground(camera);
 
       // --- WORLD SPACE RENDERING (Translated by Camera) ---
       ctx.save();
       ctx.translate(-camera.x, -camera.y);
 
       // 2. Expanded Cyber Dot Grid & World Boundaries (skipped on Level 1: image background only)
-      if (this.stage !== 'STAGE_1_CROSSWALK') this.renderWorldGrid(camera);
+      if (!hasImageBackground(this.stage)) this.renderWorldGrid(camera);
 
       // 3. Multi-Lane Highways & Checkpoint Terminals
       this.renderEnvironment(captchaZones, enemies, player);
@@ -141,10 +148,11 @@ export class GameRenderer {
     }
   }
 
-  private renderStage1Parallax(camera: { x: number; y: number }) {
-    if (this.stage !== 'STAGE_1_CROSSWALK' || !this.stage1BgReady) return;
+  private renderStageBackground(camera: { x: number; y: number }) {
+    const isLevel2 = this.stage === LEVEL2_STAGE;
+    if (!hasImageBackground(this.stage) || !(isLevel2 ? this.stage2BgReady : this.stage1BgReady)) return;
     const ctx = this.ctx;
-    const img = this.stage1Bg;
+    const img = isLevel2 ? this.stage2Bg : this.stage1Bg;
     // Background is fixed to the world (moves 1:1 with the camera, no parallax).
     const parallax = 1.0;
     // Scale to cover the canvas plus the full parallax travel range.
@@ -221,7 +229,7 @@ export class GameRenderer {
 
     // Multi-Lane Highways spanning across the 2400x1500 Cyber Arena
     // (skipped on Level 1: only the image background, enemies and captcha gates show)
-    const lanes = this.stage === 'STAGE_1_CROSSWALK' ? [] : [260, 520, 780, 1040, 1280];
+    const lanes = hasImageBackground(this.stage) ? [] : [260, 520, 780, 1040, 1280];
 
     lanes.forEach((laneY, idx) => {
       // Lane bed outline in crisp dark line
@@ -282,7 +290,7 @@ export class GameRenderer {
     ctx.save();
     ctx.translate(centerX, centerY);
 
-    const isL1 = this.stage === 'STAGE_1_CROSSWALK';
+    const isL1 = hasImageBackground(this.stage);
 
     if (isL1) {
       // High-visibility gates that pop against the busy pixel-art background
@@ -669,7 +677,7 @@ export class GameRenderer {
       ctx.fill();
 
       // High-visibility halo so enemies pop against the busy Level 1 background
-      if (this.stage === 'STAGE_1_CROSSWALK') {
+      if (hasImageBackground(this.stage)) {
         ctx.save();
         ctx.shadowColor = enemy.color;
         ctx.shadowBlur = 18;

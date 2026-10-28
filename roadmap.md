@@ -1,0 +1,2 @@
+- [ ] Apply the supplied background exclusively to Level 2 with static scenery, readable gameplay, and matching object boundaries.
+- [ ] Verify Level 1 remains unchanged and Level 2 is playable; provide the updated game ZIP.
