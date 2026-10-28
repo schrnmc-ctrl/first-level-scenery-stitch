@@ -9,7 +9,8 @@ const offsetY = (IMAGE_HEIGHT * scale - WORLD_HEIGHT) / 2;
 
 // Hand-traced solid rocks, plants and perimeter walls in source-image pixels.
 // Dunes, shadows and the diagonal road are intentionally walkable.
-const objects: number[][][] = [
+type Point = [number, number];
+const objects: Point[][] = [
   [[0,0],[943,0],[943,49],[46,49],[46,515],[0,515]],
   [[980,0],[1024,0],[1024,572],[101,572],[101,536],[976,527],[976,41]],
   [[54,69],[84,49],[113,53],[125,77],[97,98],[58,98]],
@@ -38,11 +39,12 @@ export function imageToLevel2World(x: number, y: number) {
   return { x: x * scale - offsetX, y: y * scale - offsetY };
 }
 
-function contains(polygon: number[][], x: number, y: number): boolean {
+function contains(polygon: Point[], x: number, y: number): boolean {
   let inside = false;
   for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
     const a = polygon[i];
     const b = polygon[j];
+    if (!a || !b) continue;
     if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) inside = !inside;
   }
   return inside;
