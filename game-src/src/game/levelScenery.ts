@@ -86,9 +86,9 @@ export function isSceneryBlocked(stage: string, x: number, y: number): boolean {
   return (solids[stage] ?? []).some(p => contains(p, (x + offsetX) / scale, (y + offsetY) / scale));
 }
 const roads: Record<string, Point[]> = {
-  [LEVEL1_STAGE]: [[100,492],[251,387],[399,369],[557,230],[740,190],[907,90]],
+  [LEVEL1_STAGE]: [[100,492],[251,387],[399,369],[557,230],[740,190],[924,96]],
   [LEVEL2_STAGE]: [[105,482],[264,388],[450,364],[664,340],[780,220],[910,75]],
-  [LEVEL3_STAGE]: [[180,455],[270,380],[278,283],[290,177],[565,94],[842,151]],
+  [LEVEL3_STAGE]: [[180,455],[270,380],[278,283],[290,177],[585,108],[842,151]],
 };
 export function sceneryGateCenter(stage: string, index: number) {
   const point = roads[stage]?.[Math.max(0, Math.min(5, index))];

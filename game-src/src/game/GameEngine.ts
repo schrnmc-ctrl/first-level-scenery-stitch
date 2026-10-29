@@ -13,9 +13,7 @@ import {
   GameStats,
   GameSettings,
 } from '../types';
-import { isL1Blocked } from './level1Collision';
-import { isL2Blocked, level2GateCenter, LEVEL2_STAGE } from './level2Map';
-import { hasImageBackground, isSceneryBlocked, sceneryGateCenter } from './levelScenery';
+import { hasImageBackground, isSceneryBlocked, sceneryGateCenter, LEVEL2_STAGE, LEVEL3_STAGE } from './levelScenery';
 import {
 
   CANVAS_WIDTH,
@@ -274,6 +272,14 @@ export class GameEngine {
     if (stageId === LEVEL2_STAGE) {
       this.player.x = 120;
       this.player.y = WORLD_HEIGHT - 140;
+      this.camera.x = 0;
+      this.camera.y = WORLD_HEIGHT - CANVAS_HEIGHT;
+    }
+
+    if (stageId === LEVEL3_STAGE) {
+      const spawn = sceneryGateCenter(stageId, 0);
+      this.player.x = spawn.x - 100;
+      this.player.y = spawn.y;
       this.camera.x = 0;
       this.camera.y = WORLD_HEIGHT - CANVAS_HEIGHT;
     }
@@ -756,7 +762,7 @@ export class GameEngine {
     if (this.stage === 'STAGE_1_CROSSWALK') {
       const w = 150;
       const h = 65;
-      if (isL1Blocked(zx + w / 2, zy + h / 2)) {
+      if (isSceneryBlocked(this.stage, zx + w / 2, zy + h / 2)) {
         let found = false;
         for (let radius = 40; radius <= 320 && !found; radius += 40) {
           for (let a = 0; a < 12 && !found; a++) {
