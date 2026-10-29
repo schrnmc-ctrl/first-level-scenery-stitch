@@ -10,4 +10,4 @@
 <!-- LOVABLE:END -->
 
 - Keep editable embedded-game source in `game-src`; compile it in temporary staging to `public/game` so the TanStack wrapper stays independent.
-- Use level-specific scenery selection and matching source-image/world collision transforms so backgrounds cannot leak into other stages.
+- Select backgrounds, road gates, and object boundaries through `levelScenery` with a shared source-image/world cover transform so images and collisions stay aligned and exclusive to their stages.

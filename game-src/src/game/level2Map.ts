@@ -58,7 +58,7 @@ export function isL2Blocked(x: number, y: number): boolean {
 }
 
 export function hasImageBackground(stage: string): boolean {
-  return stage === 'STAGE_1_CROSSWALK' || stage === LEVEL2_STAGE;
+  return stage === 'STAGE_1_CROSSWALK' || stage === LEVEL2_STAGE || stage === 'STAGE_3_DISTORTION';
 }
 
 export function level2GateCenter(index: number) {

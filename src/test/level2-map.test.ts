@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { hasImageBackground, imageToLevel2World, isL2Blocked, level2GateCenter } from '../../game-src/src/game/level2Map';
 
 describe('Level-specific scenery', () => {
-  it('restricts custom scenery to Levels 1 and 2', () => {
+  it('restricts custom scenery to Levels 1, 2 and 3', () => {
     expect(hasImageBackground('STAGE_1_CROSSWALK')).toBe(true);
     expect(hasImageBackground('STAGE_2_SPAM_GRID')).toBe(true);
-    expect(hasImageBackground('STAGE_3_DISTORTION')).toBe(false);
+    expect(hasImageBackground('STAGE_3_DISTORTION')).toBe(true);
     expect(hasImageBackground('STAGE_BOSS')).toBe(false);
   });
   it('blocks a rock but leaves ground and all six road gates walkable', () => {

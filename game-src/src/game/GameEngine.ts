@@ -15,6 +15,7 @@ import {
 } from '../types';
 import { isL1Blocked } from './level1Collision';
 import { isL2Blocked, level2GateCenter, LEVEL2_STAGE } from './level2Map';
+import { hasImageBackground, isSceneryBlocked, sceneryGateCenter } from './levelScenery';
 import {
 
   CANVAS_WIDTH,
@@ -396,11 +397,11 @@ export class GameEngine {
     const nextX = p.x + p.vx * dt;
     const nextY = p.y + p.vy * dt;
 
-    if (this.stage === 'STAGE_1_CROSSWALK' || this.stage === LEVEL2_STAGE) {
+    if (hasImageBackground(this.stage)) {
       // Collide with background objects (path and solid ground stay walkable).
       // Axis-separated checks let the player slide along obstacles.
       const r = Math.max(p.width, p.height) / 2;
-      const isBlocked = this.stage === LEVEL2_STAGE ? isL2Blocked : isL1Blocked;
+      const isBlocked = (x: number, y: number) => isSceneryBlocked(this.stage, x, y);
       const blocked = (x: number, y: number) =>
         isBlocked(x - r, y - r) ||
         isBlocked(x + r, y - r) ||
@@ -745,8 +746,8 @@ export class GameEngine {
     let zx = 140 + t * (WORLD_WIDTH - 380) + jitterX;
     let zy = WORLD_HEIGHT - 180 - t * (WORLD_HEIGHT - 400) + jitterY;
 
-    if (this.stage === LEVEL2_STAGE) {
-      const center = level2GateCenter(this.captchaZones.length);
+    if (hasImageBackground(this.stage)) {
+      const center = sceneryGateCenter(this.stage, this.captchaZones.length);
       zx = center.x - 75;
       zy = center.y - 32.5;
     }
@@ -762,7 +763,7 @@ export class GameEngine {
             const ang = (a / 12) * Math.PI * 2;
             const cx = zx + w / 2 + Math.cos(ang) * radius;
             const cy = zy + h / 2 + Math.sin(ang) * radius;
-            if (!isL1Blocked(cx, cy)) {
+            if (!isSceneryBlocked(this.stage, cx, cy)) {
               zx = cx - w / 2;
               zy = cy - h / 2;
               found = true;
