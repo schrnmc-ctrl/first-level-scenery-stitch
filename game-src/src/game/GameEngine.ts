@@ -269,6 +269,14 @@ export class GameEngine {
     this.projectiles = [];
     this.captchaZones = [];
 
+    if (stageId === 'STAGE_1_CROSSWALK') {
+      const spawn = sceneryGateCenter(stageId, 0);
+      this.player.x = spawn.x;
+      this.player.y = spawn.y + 50;
+      this.camera.x = 0;
+      this.camera.y = WORLD_HEIGHT - CANVAS_HEIGHT;
+    }
+
     if (stageId === LEVEL2_STAGE) {
       this.player.x = 120;
       this.player.y = WORLD_HEIGHT - 140;
