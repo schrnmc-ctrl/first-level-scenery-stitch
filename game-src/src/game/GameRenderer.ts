@@ -1,27 +1,22 @@
 import { Player, Enemy, Boss, Projectile, Particle, PowerUp, Shockwave, CaptchaZone, GameSettings } from '../types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, easeInOutSine } from './constants';
-import level2Asset from '../assets/level2-bg.jpg.asset.json';
-import { hasImageBackground, LEVEL2_STAGE } from './level2Map';
+import { backgroundUrl, hasImageBackground, LEVEL1_STAGE, LEVEL2_STAGE, LEVEL3_STAGE } from './levelScenery';
 
 export class GameRenderer {
   private ctx: CanvasRenderingContext2D;
   private time: number = 0;
   public stage: string = '';
-  private stage1Bg: HTMLImageElement;
-  private stage1BgReady: boolean = false;
-  private stage2Bg: HTMLImageElement;
-  private stage2BgReady: boolean = false;
+  private backgrounds = new Map<string, HTMLImageElement>();
 
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
-    this.stage1Bg = new Image();
-    this.stage1Bg.onload = () => {
-      this.stage1BgReady = true;
-    };
-    this.stage1Bg.src = `${import.meta.env.BASE_URL}level1-bg.png`;
-    this.stage2Bg = new Image();
-    this.stage2Bg.onload = () => { this.stage2BgReady = true; };
-    this.stage2Bg.src = level2Asset.url;
+    for (const stage of [LEVEL1_STAGE, LEVEL2_STAGE, LEVEL3_STAGE]) {
+      const url = backgroundUrl(stage);
+      if (!url) continue;
+      const image = new Image();
+      image.src = url;
+      this.backgrounds.set(stage, image);
+    }
   }
 
   public render(
@@ -149,10 +144,9 @@ export class GameRenderer {
   }
 
   private renderStageBackground(camera: { x: number; y: number }) {
-    const isLevel2 = this.stage === LEVEL2_STAGE;
-    if (!hasImageBackground(this.stage) || !(isLevel2 ? this.stage2BgReady : this.stage1BgReady)) return;
+    const img = this.backgrounds.get(this.stage);
+    if (!img?.complete || !img.naturalWidth) return;
     const ctx = this.ctx;
-    const img = isLevel2 ? this.stage2Bg : this.stage1Bg;
     // Background is fixed to the world (moves 1:1 with the camera, no parallax).
     const parallax = 1.0;
     // Scale to cover the canvas plus the full parallax travel range.
