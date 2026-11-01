@@ -1,1 +1,16 @@
 @import "tailwindcss";
+
+:root {
+  --screen-dark: #071322;
+  --screen-accent: #66efff;
+}
+
+.campaign-screen { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: var(--screen-dark); }
+.campaign-screen-stage { position: relative; width: min(100vw, 177.7778dvh); aspect-ratio: 16 / 9; }
+.campaign-screen-stage canvas { display: block; width: 100%; height: 100%; }
+.screen-hit-area { position: absolute; background: transparent; border: none; cursor: pointer; border-radius: 8px; }
+.screen-hit-area:hover { outline: 2px solid var(--screen-accent); outline-offset: 3px; }
+.screen-hit-area:focus-visible { outline: 3px solid var(--screen-accent); outline-offset: 4px; }
+.screen-fade { position: fixed; inset: 0; z-index: 100; background: var(--screen-dark); pointer-events: none; }
+.screen-fade[data-active="true"] { pointer-events: auto; }
+@media (prefers-reduced-motion: reduce) { .screen-fade { transition-duration: 0ms !important; } }
