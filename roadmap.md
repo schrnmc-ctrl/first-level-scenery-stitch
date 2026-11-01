@@ -1,3 +1,5 @@
+- [ ] Add title, story, map, upgrades and victory screens with supplied images and centralized settings.
+- [ ] Integrate three-level flow, preserve gameplay/game over, and verify transitions, restarts and fallbacks.
 - [x] Apply the supplied background exclusively to Level 2 with static scenery, readable gameplay, and matching object boundaries.
 - [x] Verify Level 1 remains unchanged and Level 2 is playable; provide the updated game ZIP. Level 2 checked directly in live gameplay; normal Level 1 progression was not completed during testing.
 - [x] Replace Level 1 and Level 2 scenery and add the supplied Level 3 scenery exclusively to Level 3.

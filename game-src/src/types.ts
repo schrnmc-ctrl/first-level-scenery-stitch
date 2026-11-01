@@ -1,4 +1,4 @@
-export type GameState = 'MENU' | 'PLAYING' | 'PAUSED' | 'CAPTCHA_POPUP' | 'BOSS_DEFEAT_CINEMATIC' | 'GAME_OVER' | 'VICTORY';
+export type GameState = 'MENU' | 'PLAYING' | 'PAUSED' | 'CAPTCHA_POPUP' | 'BOSS_DEFEAT_CINEMATIC' | 'GAME_OVER' | 'VICTORY' | 'LEVEL_COMPLETE';
 
 export interface GameSettings {
   aimMode: 'TRACKPAD_AIM' | 'MOVEMENT_DIRECTION';
