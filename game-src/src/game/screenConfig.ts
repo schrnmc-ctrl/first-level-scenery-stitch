@@ -1,12 +1,11 @@
 import title from '../assets/screen-title.jpg.asset.json';
 import victory from '../assets/screen-victory.jpg.asset.json';
-import logo from '../assets/screen-logo.png.asset.json';
 import upgrades from '../assets/screen-upgrades.jpg.asset.json';
 
 // Edit screen presentation here; gameplay and level scenery are independent.
 export const CONFIG = {
   size: { width: 800, height: 450 }, // Logical screen size; images retain their aspect ratio.
-  images: { title: title.url, victory: victory.url, logo: logo.url, upgrades: upgrades.url }, // Original-quality hosted images.
+  images: { title: title.url, victory: victory.url, upgrades: upgrades.url }, // Original-quality hosted images.
   font: '"Press Start 2P", monospace', // Pixel font with a safe local fallback.
   fontUrl: 'https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap', // Loaded with a link, not a CSS import.
   colors: { accent: '#66efff', dark: '#071322', light: '#ffffff', fallback: '#173c4c', panel: 'rgba(255,255,255,0.8)', storyShade: 'rgba(0,0,0,0.6)' }, // Screen palette and readable overlays.

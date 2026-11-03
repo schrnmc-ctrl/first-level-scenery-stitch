@@ -113,12 +113,6 @@ export function CampaignScreens({ screen, level, score, onAction }: Props) {
       ctx.fillStyle = colors.fallback; ctx.fillRect(0, 0, w, h);
       image(screen === 'victory' ? CONFIG.images.victory : screen === 'upgrades' ? CONFIG.images.upgrades : CONFIG.images.title);
       if (screen === 'title') {
-        const logo = images.get(CONFIG.images.logo);
-        if (logo?.complete && logo.naturalWidth) {
-          const logoWidth = w / 2;
-          const logoHeight = logoWidth * logo.naturalHeight / logo.naturalWidth;
-          ctx.drawImage(logo, (w - logoWidth) / 2, 24, logoWidth, logoHeight);
-        } else text('DELIVERANCE', w / 2, 100, 28);
         button({ label: CONFIG.buttons.start, x: 270, y: 340, width: 260, height: 52 });
         if (Math.floor(elapsed / CONFIG.timing.blink) % 2 === 0) text('Press SPACE to start', 400, 420, 12);
       }
