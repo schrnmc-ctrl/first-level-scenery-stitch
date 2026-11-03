@@ -14,3 +14,5 @@
 .screen-fade { position: fixed; inset: 0; z-index: 100; background: var(--screen-dark); pointer-events: none; }
 .screen-fade[data-active="true"] { pointer-events: auto; }
 @media (prefers-reduced-motion: reduce) { .screen-fade { transition-duration: 0ms !important; } }
+
+.campaign-fade { position: fixed; inset: 0; z-index: 70; background: #000; pointer-events: none; transition-property: opacity; }

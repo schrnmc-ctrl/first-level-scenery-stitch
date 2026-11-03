@@ -19,6 +19,9 @@ import { VirtualControls } from './components/VirtualControls';
 import { PauseModal } from './components/PauseModal';
 import { SettingsModal } from './components/SettingsModal';
 import { GameSettings, GameState } from './types';
+import { CampaignScreens } from './components/CampaignScreens';
+import { CAMPAIGN_STAGES, applyUpgrade } from './game/campaign';
+import { CONFIG, type ScreenId } from './game/screenConfig';
 import {
   Shield,
   Zap,
@@ -53,7 +56,7 @@ export default function App() {
   });
 
   const [fpsCount, setFpsCount] = useState<number>(120);
-  const [showIntroCinematic, setShowIntroCinematic] = useState<boolean>(true);
+  const [showIntroCinematic, setShowIntroCinematic] = useState<boolean>(false);
   const [showStoryModal, setShowStoryModal] = useState<boolean>(false);
   const [showSettingsModal, setShowSettingsModal] = useState<boolean>(false);
   const [activeCaptcha, setActiveCaptcha] = useState<any>(null);
@@ -62,6 +65,47 @@ export default function App() {
   const [stageId, setStageId] = useState<any>('STAGE_1_CROSSWALK');
   const [captchasSolved, setCaptchasSolved] = useState<number>(0);
   const [gameStats, setGameStats] = useState<any>(null);
+  const [campaignScreen, setCampaignScreen] = useState<ScreenId | null>('title');
+  const [campaignLevel, setCampaignLevel] = useState(1);
+  const [fading, setFading] = useState(false);
+
+  // Fade to black, swap screen, fade back in.
+  const transition = useCallback((change: () => void) => {
+    setFading(true);
+    window.setTimeout(() => { change(); setFading(false); }, CONFIG.timing.fade);
+  }, []);
+
+  const startLevel = useCallback((level: number) => {
+    const engine = engineRef.current;
+    if (!engine) return;
+    if (level === 1) engine.resetGame();
+    engine.startCampaignStage(CAMPAIGN_STAGES[level - 1]);
+    setCampaignScreen(null);
+    setGameState('PLAYING');
+  }, []);
+
+  const handleCampaignAction = useCallback((action?: string) => {
+    if (fading) return;
+    if (campaignScreen === 'title') transition(() => setCampaignScreen('story'));
+    else if (campaignScreen === 'story') transition(() => { setCampaignLevel(1); setCampaignScreen('map'); });
+    else if (campaignScreen === 'map') transition(() => startLevel(campaignLevel));
+    else if (campaignScreen === 'upgrades' && action) {
+      if (engineRef.current) applyUpgrade(engineRef.current.player, action);
+      transition(() => { setCampaignLevel(l => l + 1); setCampaignScreen('map'); });
+    } else if (campaignScreen === 'victory') transition(() => {
+      engineRef.current?.resetGame();
+      if (engineRef.current) engineRef.current.gameState = 'MENU';
+      setGameState('MENU'); setCampaignLevel(1); setCampaignScreen('title');
+    });
+  }, [campaignScreen, campaignLevel, fading, transition, startLevel]);
+
+  // A finished level leads to upgrades (Levels 1-2) or the ending (Level 3).
+  useEffect(() => {
+    if (gameState !== 'LEVEL_COMPLETE' || campaignScreen) return;
+    const engine = engineRef.current;
+    if (engine) engine.gameState = 'MENU';
+    transition(() => setCampaignScreen(campaignLevel >= CAMPAIGN_STAGES.length ? 'victory' : 'upgrades'));
+  }, [gameState, campaignScreen, campaignLevel, transition]);
 
   // Initialize Game Engine on mount
   useEffect(() => {
@@ -473,7 +517,7 @@ export default function App() {
           </AnimatePresence>
 
           {/* Start Screen with Hook & Mode Selection */}
-          {gameState === 'MENU' && !showIntroCinematic && (
+          {false && (
             <StartScreen
               onStartGame={handleStartGame}
               onPracticeCaptcha={handlePracticeCaptcha}
@@ -616,11 +660,16 @@ export default function App() {
               <GameOverModal
                 player={playerState}
                 stats={gameStats}
-                onRetry={() => handleStartGame('standard')}
+                onRetry={() => startLevel(campaignLevel)}
               />
             )}
           </AnimatePresence>
         </div>
+
+        {campaignScreen && (
+          <CampaignScreens screen={campaignScreen} level={campaignLevel} score={playerState?.score ?? 0} onAction={handleCampaignAction} />
+        )}
+        <div className="campaign-fade" style={{ opacity: fading ? 1 : 0, transitionDuration: `${CONFIG.timing.fade}ms` }} />
 
         {/* Mobile / Touch Virtual Controls */}
         <VirtualControls
