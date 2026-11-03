@@ -1,3 +1,4 @@
+import { CAMPAIGN_STAGES, GATES_PER_LEVEL, allGatesSolved } from './campaign';
 import {
   Player,
   Enemy,
@@ -293,10 +294,7 @@ export class GameEngine {
     }
 
     if (stageId !== 'STAGE_BOSS') {
-      this.spawnCaptchaZone();
-      this.spawnCaptchaZone();
-      this.spawnCaptchaZone();
-      this.spawnCaptchaZone();
+      for (let i = 0; i < GATES_PER_LEVEL; i++) this.spawnCaptchaZone();
     } else {
       this.initBoss();
       sound.playBossAlarm();
@@ -1218,6 +1216,7 @@ export class GameEngine {
 
         if (insideX && insideY) {
           nextZone.checked = true;
+          this.pendingZone = nextZone;
           this.triggerInteractiveCaptcha();
         }
       }
@@ -1316,13 +1315,32 @@ export class GameEngine {
       this.glitchIntensity = 0.8;
       sound.playHit();
       this.addTextParticle(this.player.x, this.player.y, 'CAPTCHA FAILED! -15% BATTERY', '#ef4444');
+      if (this.pendingZone) this.pendingZone.checked = false;
+      this.captchaGraceTimer = Math.max(this.captchaGraceTimer, 1.5);
     }
+    this.pendingZone = null;
 
     this.activeCaptcha = null;
     this.gameState = 'PLAYING';
   }
 
+  private pendingZone: CaptchaZone | null = null;
+
+  /** Campaign: start a level fresh while keeping the player's upgrades and score. */
+  public startCampaignStage(stage: StageId) {
+    this.initStage(stage);
+    this.gameState = 'PLAYING';
+  }
+
   private checkStageProgress() {
+    // Campaign levels finish only once every gate is solved, in order.
+    if (CAMPAIGN_STAGES.includes(this.stage)) {
+      if (allGatesSolved(this.captchaZones) && !this.activeCaptcha) {
+        this.gameState = 'LEVEL_COMPLETE';
+        sound.playPowerUp();
+      }
+      return;
+    }
     const config = STAGE_CONFIGS[this.stage];
 
     if (this.stage === 'STAGE_1_CROSSWALK') {
