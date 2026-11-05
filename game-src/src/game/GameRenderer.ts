@@ -1,15 +1,23 @@
 import { Player, Enemy, Boss, Projectile, Particle, PowerUp, Shockwave, CaptchaZone, GameSettings } from '../types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, easeInOutSine } from './constants';
 import { backgroundUrl, hasImageBackground, LEVEL1_STAGE, LEVEL2_STAGE, LEVEL3_STAGE } from './levelScenery';
+import { HERO_IMAGES } from './hero';
 
 export class GameRenderer {
   private ctx: CanvasRenderingContext2D;
   private time: number = 0;
   public stage: string = '';
   private backgrounds = new Map<string, HTMLImageElement>();
+  private heroImages = new Map<string, HTMLImageElement>();
 
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
+    // Preload all three frames once; only idle is displayed in this step.
+    for (const [frame, url] of Object.entries(HERO_IMAGES)) {
+      const image = new Image();
+      image.src = url;
+      this.heroImages.set(frame, image);
+    }
     for (const stage of [LEVEL1_STAGE, LEVEL2_STAGE, LEVEL3_STAGE]) {
       const url = backgroundUrl(stage);
       if (!url) continue;
@@ -609,6 +617,18 @@ export class GameRenderer {
     // Invincibility flashing
     if (player.invincibleTimer > 0 && Math.floor(player.invincibleTimer * 16) % 2 === 0) {
       ctx.globalAlpha = 0.35;
+    }
+
+    const hero = this.heroImages.get('idle');
+    if (hero?.complete && hero.naturalWidth) {
+      // Never rotate the right-facing art with aim; scale up from its feet.
+      ctx.imageSmoothingEnabled = false;
+      const height = player.height;
+      const width = height * hero.naturalWidth / hero.naturalHeight;
+      const feetY = player.height / 2;
+      ctx.drawImage(hero, -width / 2, feetY - height, width, height);
+      ctx.restore();
+      return;
     }
 
     // Wi-Fi signal circle ring surrounding user with subtle ease-in-out expansion

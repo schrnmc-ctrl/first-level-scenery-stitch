@@ -267,6 +267,11 @@ export default function App() {
         return;
       }
 
+      // H simulates one hit per press, only during active gameplay.
+      if (e.code === 'KeyH') {
+        if (!e.repeat) engine.hitHero();
+        return;
+      }
       engine.keys[e.code] = true;
 
       // Space, KeyE, or KeyQ triggers the EMP Shockwave

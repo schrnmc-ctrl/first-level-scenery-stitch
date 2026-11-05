@@ -5,7 +5,7 @@ export const CANVAS_HEIGHT = 750;
 export const WORLD_WIDTH = 2400;
 export const WORLD_HEIGHT = 1500;
 
-export const PLAYER_SPEED = 300; // tuned for spacious expanded arena
+export const PLAYER_SPEED = 240; // Hero base speed in world pixels per second.
 export const PLAYER_SIZE = 28;
 export const BATTERY_DRAIN_ON_HIT = 12;
 export const BATTERY_DRAIN_PER_SEC = 0.4;

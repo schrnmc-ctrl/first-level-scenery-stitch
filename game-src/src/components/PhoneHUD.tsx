@@ -2,6 +2,7 @@ import React from 'react';
 import { Player, StageId } from '../types';
 import {
   Battery,
+  Heart,
   Wifi,
   Zap,
   Volume2,
@@ -172,6 +173,10 @@ export const PhoneHUD: React.FC<PhoneHUDProps> = ({
 
         {/* Right: High-Clarity Vital Meters */}
         <div className="flex items-center gap-3 sm:gap-4">
+          {/* Visible hero lives; this does not replace the existing battery meter. */}
+          <span className="hero-lives" role="status" aria-label={`${player.lives} lives remaining`}>
+            <Heart size={16} aria-hidden="true" /> {player.lives}/3
+          </span>
           {/* Wi-Fi Signal Indicator */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-zinc-100 border border-zinc-300 shadow-xs">
             <Wifi className="w-3.5 h-3.5 text-zinc-700" />

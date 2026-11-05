@@ -33,6 +33,7 @@ import {
 } from './constants';
 import { sound } from '../audio/soundEffects';
 import { generateRandomCaptcha } from './captchaGenerator';
+import { HERO_HEIGHT, HERO_WIDTH, HERO_LIVES, heroBox, heroOverlapsBox, heroOverlapsCircle, takeHeroHit } from './hero';
 
 export class GameEngine {
   public player: Player;
@@ -132,14 +133,15 @@ export class GameEngine {
     return {
       x: 120,
       y: WORLD_HEIGHT - 120,
-      width: PLAYER_SIZE,
-      height: PLAYER_SIZE,
+      width: HERO_WIDTH,
+      height: HERO_HEIGHT,
       vx: 0,
       vy: 0,
       speed: PLAYER_SPEED,
       angle: -Math.PI / 2,
       battery: 100,
       maxBattery: 100,
+      lives: HERO_LIVES,
       wifiLevel: 1,
       shockwaveCooldown: 0,
       shockwaveMaxCooldown: 4.0,
@@ -173,6 +175,14 @@ export class GameEngine {
     this.gameState = 'PLAYING';
     this.activeCaptcha = null;
     this.initStage(this.stage);
+  }
+
+  // Reuse the existing game-over screen without altering campaign presentation.
+  public hitHero(): boolean {
+    if (this.gameState !== 'PLAYING' || !takeHeroHit(this.player)) return false;
+    sound.playHit();
+    if (this.player.lives === 0) this.triggerGameOver('Your hero ran out of lives!');
+    return true;
   }
 
   public startEndlessMode() {
@@ -412,13 +422,15 @@ export class GameEngine {
     if (hasImageBackground(this.stage)) {
       // Collide with background objects (path and solid ground stay walkable).
       // Axis-separated checks let the player slide along obstacles.
-      const r = Math.max(p.width, p.height) / 2;
       const isBlocked = (x: number, y: number) => isSceneryBlocked(this.stage, x, y);
-      const blocked = (x: number, y: number) =>
-        isBlocked(x - r, y - r) ||
-        isBlocked(x + r, y - r) ||
-        isBlocked(x - r, y + r) ||
-        isBlocked(x + r, y + r);
+      // Sample the 70% box edges, leaving the existing scenery polygons untouched.
+      const blocked = (x: number, y: number) => {
+        const box = heroBox({ ...p, x, y });
+        for (const bx of [box.left, x, box.right]) {
+          for (const by of [box.top, y, box.bottom]) if (isBlocked(bx, by)) return true;
+        }
+        return false;
+      };
       if (!blocked(nextX, p.y)) p.x = nextX;
       if (!blocked(p.x, nextY)) p.y = nextY;
     } else {
@@ -427,8 +439,11 @@ export class GameEngine {
     }
 
     // Clamp within expanded world arena
-    p.x = Math.max(p.width / 2 + 18, Math.min(WORLD_WIDTH - p.width / 2 - 18, p.x));
-    p.y = Math.max(p.height / 2 + 18, Math.min(WORLD_HEIGHT - p.height / 2 - 18, p.y));
+    const box = heroBox(p);
+    const halfWidth = (box.right - box.left) / 2;
+    const halfHeight = (box.bottom - box.top) / 2;
+    p.x = Math.max(halfWidth + 18, Math.min(WORLD_WIDTH - halfWidth - 18, p.x));
+    p.y = Math.max(halfHeight + 18, Math.min(WORLD_HEIGHT - halfHeight - 18, p.y));
 
     // Emit movement particles & dust specks when moving
     if (Math.abs(p.vx) > 10 || Math.abs(p.vy) > 10) {
@@ -474,7 +489,7 @@ export class GameEngine {
     p.battery = Math.max(0, p.battery - BATTERY_DRAIN_PER_SEC * dt);
 
     if (p.invincibleTimer > 0) {
-      p.invincibleTimer -= dt;
+      p.invincibleTimer = Math.max(0, p.invincibleTimer - dt);
     }
 
     if (p.shockwaveCooldown > 0) {
@@ -984,9 +999,8 @@ export class GameEngine {
       const angleDiff = Math.abs(
         Math.atan2(Math.sin(angleToPlayer - boss.laserAngle), Math.cos(angleToPlayer - boss.laserAngle))
       );
-      if (angleDiff < 0.14 && p.invincibleTimer <= 0) {
+      if (angleDiff < 0.14 && this.hitHero()) {
         p.battery = Math.max(0, p.battery - 24);
-        p.invincibleTimer = 1.0;
         this.glitchIntensity = 0.8;
         sound.playHit();
         this.addTextParticle(p.x, p.y, 'VERIFICATION LASER HIT! -24%', '#ef4444');
@@ -1163,10 +1177,8 @@ export class GameEngine {
       if (proj.fromPlayer) return;
       if (p.invincibleTimer > 0) return;
 
-      const dist = Math.hypot(p.x - proj.x, p.y - proj.y);
-      if (dist < p.width / 2 + proj.radius) {
+      if (heroOverlapsCircle(p, proj.x, proj.y, proj.radius) && this.hitHero()) {
         p.battery = Math.max(0, p.battery - BATTERY_DRAIN_ON_HIT);
-        p.invincibleTimer = 0.8;
         proj.life = proj.maxLife;
         this.glitchIntensity = 0.6;
         sound.playHit();
@@ -1177,11 +1189,9 @@ export class GameEngine {
     this.enemies.forEach((enemy) => {
       if (p.invincibleTimer > 0) return;
 
-      const dist = Math.hypot(p.x - enemy.x, p.y - enemy.y);
-      if (dist < p.width / 2 + enemy.width / 2) {
+      if (heroOverlapsBox(p, enemy.x, enemy.y, enemy.width, enemy.height) && this.hitHero()) {
         const damage = enemy.type === 'GLITCH_CAR' ? 30 : 16;
         p.battery = Math.max(0, p.battery - damage);
-        p.invincibleTimer = 1.0;
         this.glitchIntensity = 0.7;
         sound.playHit();
         this.addTextParticle(p.x, p.y, `HAZARD HIT! -${damage}%`, '#ef4444');

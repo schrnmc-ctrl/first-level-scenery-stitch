@@ -3,7 +3,10 @@
 :root {
   --screen-dark: #071322;
   --screen-accent: #66efff;
+  --hero-life-color: #b52136;
 }
+
+.hero-lives { display: inline-flex; align-items: center; gap: 6px; color: var(--hero-life-color); font: bold 12px monospace; white-space: nowrap; }
 
 .campaign-screen { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: var(--screen-dark); }
 .campaign-screen-stage { position: relative; width: min(100vw, 177.7778dvh); aspect-ratio: 16 / 9; }
