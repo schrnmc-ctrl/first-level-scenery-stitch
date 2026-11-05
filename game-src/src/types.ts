@@ -40,6 +40,7 @@ export interface Player {
   angle: number;
   battery: number; // 0 - 100%
   maxBattery: number;
+  lives: number; // Separate hero lives; battery mechanics remain unchanged.
   wifiLevel: number; // 1 to 4
   shockwaveCooldown: number; // in seconds
   shockwaveMaxCooldown: number;
