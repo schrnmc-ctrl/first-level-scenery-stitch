@@ -6,7 +6,7 @@ import { CANVAS_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT } from '../../game-src/src/gam
 import { imageToWorld, isSceneryBlocked } from '../../game-src/src/game/levelScenery';
 
 describe('Hero rules', () => {
-  let engine: GameEngine;
+  let engine;
   beforeEach(() => { engine = new GameEngine(); engine.gameState = 'PLAYING'; });
   it('starts with 3 lives and resets them for a new game', () => {
     expect(engine.player.lives).toBe(3);
