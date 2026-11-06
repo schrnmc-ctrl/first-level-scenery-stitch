@@ -12,6 +12,12 @@ export const HERO_LIVES = 3;
 export const HERO_IMMUNITY_SECONDS = 1;
 export const HERO_IMAGES = { idle: idle.url, runA: runA.url, runB: runB.url };
 
+// A time-based two-frame cycle stays consistent at different rendering rates.
+export function heroAnimationFrame(moving: boolean, elapsedSeconds: number): keyof typeof HERO_IMAGES {
+  if (!moving) return 'idle';
+  return Math.floor(elapsedSeconds / 0.12) % 2 === 0 ? 'runA' : 'runB';
+}
+
 // The player position is the body center; the lower edge stays fixed while drawing.
 export function heroBox(player: Pick<Player, 'x' | 'y' | 'width' | 'height'>) {
   const halfWidth = player.width * HERO_HITBOX_SCALE / 2;

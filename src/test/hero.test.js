@@ -1,11 +1,21 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 vi.mock('../../game-src/src/audio/soundEffects', () => ({ sound: new Proxy({}, { get: () => vi.fn(), set: () => true }) }));
 import { GameEngine } from '../../game-src/src/game/GameEngine';
-import { HERO_HEIGHT, HERO_WIDTH, heroBox, heroOverlapsBox, heroOverlapsCircle } from '../../game-src/src/game/hero';
+import { HERO_HEIGHT, HERO_WIDTH, heroBox, heroOverlapsBox, heroOverlapsCircle, heroAnimationFrame } from '../../game-src/src/game/hero';
 import { CANVAS_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT } from '../../game-src/src/game/constants';
 import { imageToWorld, isSceneryBlocked } from '../../game-src/src/game/levelScenery';
 
 describe('Hero rules', () => {
+  it('alternates both loaded run frames while moving', () => {
+    expect(heroAnimationFrame(true, 0)).toBe('runA');
+    expect(heroAnimationFrame(true, 0.13)).toBe('runB');
+    expect(heroAnimationFrame(true, 0.25)).toBe('runA');
+  });
+  it('uses idle while standing still regardless of animation time', () => {
+    expect(heroAnimationFrame(false, 0)).toBe('idle');
+    expect(heroAnimationFrame(false, 0.13)).toBe('idle');
+    expect(heroAnimationFrame(false, 100)).toBe('idle');
+  });
   let engine;
   beforeEach(() => { engine = new GameEngine(); engine.gameState = 'PLAYING'; });
   it('starts with 3 lives and resets them for a new game', () => {

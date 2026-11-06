@@ -1,3 +1,4 @@
+- [x] Animate the hero with both loaded run frames during movement and idle when stationary; 10 hero tests passed and live Level 1 drawing confirmed both run frames and idle on stopping without browser errors.
 - [x] Add supplied idle hero and preload run frames, preserving spawn/scenery/screens; 18 tests passed and live campaign entry, movement, three lives, H immunity and game over verified without browser errors.
 - [x] Add title, story, map, upgrades and victory screens with supplied images and centralized settings.
 - [x] Integrate three-level flow (all 6 gates in order finish a level); title→story→map→Level 1 verified live, upgrade/victory path not played through.
