@@ -1,7 +1,7 @@
 import { Player, Enemy, Boss, Projectile, Particle, PowerUp, Shockwave, CaptchaZone, GameSettings } from '../types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, easeInOutSine } from './constants';
 import { backgroundUrl, hasImageBackground, LEVEL1_STAGE, LEVEL2_STAGE, LEVEL3_STAGE } from './levelScenery';
-import { HERO_IMAGES } from './hero';
+import { HERO_IMAGES, heroAnimationFrame } from './hero';
 
 export class GameRenderer {
   private ctx: CanvasRenderingContext2D;
@@ -9,10 +9,13 @@ export class GameRenderer {
   public stage: string = '';
   private backgrounds = new Map<string, HTMLImageElement>();
   private heroImages = new Map<string, HTMLImageElement>();
+  private heroLastPosition: { x: number; y: number } | null = null;
+  private heroLastTime = 0;
+  private heroRunTime = 0;
 
   constructor(ctx: CanvasRenderingContext2D) {
     this.ctx = ctx;
-    // Preload all three frames once; only idle is displayed in this step.
+    // Preload idle and both run frames once, avoiding loads during animation.
     for (const [frame, url] of Object.entries(HERO_IMAGES)) {
       const image = new Image();
       image.src = url;
@@ -619,7 +622,16 @@ export class GameRenderer {
       ctx.globalAlpha = 0.35;
     }
 
-    const hero = this.heroImages.get('idle');
+    // Animate actual displacement, not held keys, so walls and pauses show idle.
+    const previous = this.heroLastPosition;
+    const moving = previous !== null && Math.hypot(player.x - previous.x, player.y - previous.y) > 0.001;
+    const elapsed = Math.max(0, Math.min(0.04, this.time - this.heroLastTime));
+    this.heroRunTime = moving ? this.heroRunTime + elapsed : 0;
+    this.heroLastPosition = { x: player.x, y: player.y };
+    this.heroLastTime = this.time;
+    const frame = this.heroImages.get(heroAnimationFrame(moving, this.heroRunTime));
+    // Keep idle as a fallback if a run image has not finished loading.
+    const hero = frame?.complete && frame.naturalWidth ? frame : this.heroImages.get('idle');
     if (hero?.complete && hero.naturalWidth) {
       // Never rotate the right-facing art with aim; scale up from its feet.
       ctx.imageSmoothingEnabled = false;
