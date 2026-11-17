@@ -57,7 +57,8 @@ export type EnemyType =
   | 'GLITCH_CAR' 
   | 'FIRE_HYDRANT_BOT' 
   | 'BICYCLE_DRONE'
-  | 'CAPTCHA_TILE_SEEKER';
+  | 'CAPTCHA_TILE_SEEKER'
+  | 'VIRUS'; // Level 1 only enemy
 
 export interface Enemy {
   id: string;
@@ -75,6 +76,7 @@ export interface Enemy {
   activeState?: 'RED' | 'YELLOW' | 'GREEN';
   warningTimer?: number;
   direction?: 'LEFT' | 'RIGHT' | 'UP' | 'DOWN';
+  virus?: import('./game/virus').VirusState; // Virus-only animation and attack state
   iconType: 'crosswalk' | 'car' | 'traffic_light' | 'bot' | 'hydrant' | 'bicycle' | 'bus';
 }
 
@@ -113,7 +115,7 @@ export interface Projectile {
   fromPlayer: boolean;
   life: number;
   maxLife: number;
-  type: 'WIFI_PULSE' | 'GLITCH_DATA' | 'CAPTCHA_CHAR' | 'BOSS_LASER_ORB';
+  type: 'WIFI_PULSE' | 'GLITCH_DATA' | 'CAPTCHA_CHAR' | 'BOSS_LASER_ORB' | 'VIRUS_ORB';
   charText?: string;
 }
 
@@ -135,7 +137,7 @@ export interface Particle {
   color: string;
   life: number;
   maxLife: number;
-  shape?: 'square' | 'circle' | 'text' | 'ring' | 'shard' | 'spark';
+  shape?: 'square' | 'circle' | 'text' | 'ring' | 'shard' | 'spark' | 'smoke';
   text?: string;
   rotation?: number;
   vRot?: number;

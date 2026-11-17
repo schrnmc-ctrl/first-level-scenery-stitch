@@ -267,11 +267,6 @@ export default function App() {
         return;
       }
 
-      // H simulates one hit per press, only during active gameplay.
-      if (e.code === 'KeyH') {
-        if (!e.repeat) engine.hitHero();
-        return;
-      }
       engine.keys[e.code] = true;
 
       // Space, KeyE, or KeyQ triggers the EMP Shockwave
@@ -542,8 +537,9 @@ export default function App() {
             {gameState === 'BOSS_DEFEAT_CINEMATIC' && (
               <BossDefeatCinematic
                 onComplete={() => {
+                  // Campaign boss win finishes Level 3 and opens the victory screen.
                   engineRef.current?.triggerVictory();
-                  setGameState('VICTORY');
+                  setGameState(engineRef.current?.gameState ?? 'VICTORY');
                 }}
               />
             )}

@@ -1,7 +1,7 @@
 import type { CaptchaZone, Player, StageId } from '../types';
 import { CONFIG } from './screenConfig';
 
-export const CAMPAIGN_STAGES: StageId[] = ['STAGE_1_CROSSWALK', 'STAGE_2_SPAM_GRID', 'STAGE_3_DISTORTION'];
+export const CAMPAIGN_STAGES: StageId[] = ['STAGE_1_CROSSWALK', 'STAGE_2_SPAM_GRID', 'STAGE_BOSS'] // Level 3 = boss, final level;
 export const GATES_PER_LEVEL = 6;
 
 export function allGatesSolved(zones: Pick<CaptchaZone, 'checked'>[]): boolean {

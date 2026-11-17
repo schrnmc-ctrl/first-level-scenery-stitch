@@ -6,7 +6,11 @@ import level3 from '../assets/level3-bg.jpg.asset.json';
 export const LEVEL1_STAGE = 'STAGE_1_CROSSWALK';
 export const LEVEL2_STAGE = 'STAGE_2_SPAM_GRID';
 export const LEVEL3_STAGE = 'STAGE_3_DISTORTION';
+// The boss stage is campaign Level 3, so it uses the Level 3 scenery.
+export const BOSS_STAGE = 'STAGE_BOSS';
+const sceneryKey = (stage: string) => (stage === BOSS_STAGE ? LEVEL3_STAGE : stage);
 export function backgroundUrl(stage: string): string | undefined {
+  stage = sceneryKey(stage);
   if (stage === LEVEL1_STAGE) return level1.url;
   if (stage === LEVEL2_STAGE) return level2.url;
   if (stage === LEVEL3_STAGE) return level3.url;
@@ -83,7 +87,7 @@ function contains(polygon: Point[], x: number, y: number) {
 }
 export function isSceneryBlocked(stage: string, x: number, y: number): boolean {
   if (x < 0 || y < 0 || x > WORLD_WIDTH || y > WORLD_HEIGHT) return true;
-  return (solids[stage] ?? []).some(p => contains(p, (x + offsetX) / scale, (y + offsetY) / scale));
+  return (solids[sceneryKey(stage)] ?? []).some(p => contains(p, (x + offsetX) / scale, (y + offsetY) / scale));
 }
 const roads: Record<string, Point[]> = {
   [LEVEL1_STAGE]: [[100,492],[251,387],[399,369],[557,230],[740,190],[924,96]],
@@ -91,6 +95,6 @@ const roads: Record<string, Point[]> = {
   [LEVEL3_STAGE]: [[180,455],[270,380],[278,283],[290,177],[585,108],[842,151]],
 };
 export function sceneryGateCenter(stage: string, index: number) {
-  const point = roads[stage]?.[Math.max(0, Math.min(5, index))];
+  const point = roads[sceneryKey(stage)]?.[Math.max(0, Math.min(5, index))];
   return point ? imageToWorld(point[0], point[1]) : imageToWorld(500, 285);
 }

@@ -1,3 +1,8 @@
+import {
+  createVirusState, stepVirusAttack, virusBox, VIRUS_BALL_COLOR, VIRUS_BALL_LIFE, VIRUS_BALL_RADIUS,
+  VIRUS_BALL_SPEED, VIRUS_FLASH, VIRUS_HEIGHT, VIRUS_HIT_IMMUNITY, VIRUS_MAX, VIRUS_MIN_SPAWN_DISTANCE,
+  VIRUS_SMOKE_SECONDS, VIRUS_SPEED, VIRUS_WIDTH,
+} from './virus';
 import { CAMPAIGN_STAGES, GATES_PER_LEVEL, allGatesSolved } from './campaign';
 import {
   Player,
@@ -295,7 +300,7 @@ export class GameEngine {
       this.camera.y = WORLD_HEIGHT - CANVAS_HEIGHT;
     }
 
-    if (stageId === LEVEL3_STAGE) {
+    if (stageId === LEVEL3_STAGE || stageId === 'STAGE_BOSS') {
       const spawn = sceneryGateCenter(stageId, 0);
       this.player.x = spawn.x - 100;
       this.player.y = spawn.y;
@@ -602,6 +607,14 @@ export class GameEngine {
     const effectiveCarInterval = (config.carInterval / diffMul) * trafficWave;
     const effectiveBotInterval = config.botInterval / diffMul;
 
+    // Level 1: the Virus replaces every other enemy (no cars, lights or bots).
+    if (this.stage === 'STAGE_1_CROSSWALK') {
+      this.virusSpawnTimer -= dt;
+      if (this.virusSpawnTimer <= 0) {
+        this.virusSpawnTimer = 1.2 + Math.random() * 2.3; // random cadence
+        this.spawnVirus();
+      }
+    } else {
     this.spawnCarTimer += dt;
     if (this.spawnCarTimer >= effectiveCarInterval) {
       this.spawnCarTimer = 0;
@@ -615,6 +628,7 @@ export class GameEngine {
     if (this.spawnBotTimer >= effectiveBotInterval) {
       this.spawnBotTimer = 0;
       this.spawnChallengingEnemies(diffMul);
+    }
     }
 
     this.spawnPowerUpTimer += dt;
@@ -630,6 +644,88 @@ export class GameEngine {
         this.spawnCaptchaZone();
       }
     }
+  }
+
+  private virusSpawnTimer = 1;
+
+  // Virus hitbox fits inside the level, away from walls and other Viruses.
+  private virusSpotFree(x: number, y: number, self?: Enemy) {
+    const b = virusBox(x, y);
+    const corners = [[b.left, b.top], [b.right, b.top], [b.left, b.bottom], [b.right, b.bottom]];
+    if (corners.some(([cx, cy]) => isSceneryBlocked(this.stage, cx!, cy!))) return false;
+    return !this.enemies.some((o) => o !== self && o.type === 'VIRUS' && o.hp > 0 &&
+      Math.abs(o.x - x) < b.w && Math.abs(o.y - y) < b.h);
+  }
+
+  // Random spot inside the boundaries, at least 200 px from the hero, max 6 alive.
+  private spawnVirus() {
+    if (this.enemies.filter((e) => e.type === 'VIRUS').length >= VIRUS_MAX) return;
+    for (let attempt = 0; attempt < 40; attempt++) {
+      const x = 40 + Math.random() * (WORLD_WIDTH - 80);
+      const y = 60 + Math.random() * (WORLD_HEIGHT - 100);
+      if (Math.hypot(x - this.player.x, y - this.player.y) < VIRUS_MIN_SPAWN_DISTANCE) continue;
+      if (!this.virusSpotFree(x, y)) continue;
+      this.enemies.push({
+        id: Math.random().toString(), type: 'VIRUS', x, y, width: VIRUS_WIDTH, height: VIRUS_HEIGHT,
+        vx: 0, vy: 0, hp: 1, maxHp: 1, color: VIRUS_BALL_COLOR, iconType: 'bot', virus: createVirusState(),
+      });
+      return;
+    }
+  }
+
+  // Chase straight at the hero; stop and run the 3-step attack when in range.
+  private updateVirus(e: Enemy, dt: number) {
+    const v = e.virus!;
+    const p = this.player;
+    v.age += dt;
+    v.flashTimer = Math.max(0, v.flashTimer - dt);
+    v.hitImmunity = Math.max(0, v.hitImmunity - dt);
+    const body = virusBox(e.x, e.y);
+    const dx = p.x - body.cx;
+    const dy = p.y - body.cy;
+    const dist = Math.hypot(dx, dy);
+    if (stepVirusAttack(v, dt, dist)) {
+      // Strike: one glowing ball aimed at the hero.
+      this.projectiles.push({
+        id: Math.random().toString(), x: body.cx, y: body.cy,
+        vx: (dx / (dist || 1)) * VIRUS_BALL_SPEED, vy: (dy / (dist || 1)) * VIRUS_BALL_SPEED,
+        radius: VIRUS_BALL_RADIUS, color: VIRUS_BALL_COLOR, damage: 0, fromPlayer: false,
+        life: 0, maxLife: VIRUS_BALL_LIFE, type: 'VIRUS_ORB',
+      });
+    }
+    if (dx !== 0) v.facingLeft = dx < 0;
+    v.moving = false;
+    if (v.phase !== 'move' || dist <= 200 || dist < 1) return;
+    const stepX = (dx / dist) * VIRUS_SPEED * dt;
+    const stepY = (dy / dist) * VIRUS_SPEED * dt;
+    // Axis-separated moves let it slide along walls and around other Viruses.
+    if (this.virusSpotFree(e.x + stepX, e.y, e)) { e.x += stepX; v.moving = true; }
+    if (this.virusSpotFree(e.x, e.y + stepY, e)) { e.y += stepY; v.moving = true; }
+  }
+
+  // Hero shot: white flash, floating "-1", 0.3 s before it can be hit again.
+  private hitVirus(e: Enemy) {
+    const v = e.virus!;
+    if (v.hitImmunity > 0) return;
+    v.hitImmunity = VIRUS_HIT_IMMUNITY;
+    v.flashTimer = VIRUS_FLASH;
+    e.hp -= 1;
+    this.particles.push({ x: e.x, y: e.y - VIRUS_HEIGHT - 4, vx: 0, vy: -40, size: 12, color: '#ffffff',
+      life: 0.5, maxLife: 0.5, shape: 'text', text: '-1' });
+  }
+
+  // Defeat: a puff of gray smoke circles that grow and fade over 0.5 s.
+  private puffVirus(e: Enemy) {
+    for (let i = 0; i < 7; i++) {
+      const a = (i / 7) * Math.PI * 2;
+      this.particles.push({ x: e.x + Math.cos(a) * 8, y: e.y - VIRUS_HEIGHT / 2 + Math.sin(a) * 8,
+        vx: Math.cos(a) * 30, vy: Math.sin(a) * 30 - 10, size: 12 + Math.random() * 8,
+        color: i % 2 ? '#9ca3af' : '#6b7280', life: VIRUS_SMOKE_SECONDS, maxLife: VIRUS_SMOKE_SECONDS, shape: 'smoke' });
+    }
+    this.enemiesDefeatedCount += 1;
+    this.player.score += 110;
+    this.player.streak += 1;
+    sound.playBotExplode();
   }
 
   private spawnGlitchCar(diffMul: number = 1.0) {
@@ -818,7 +914,9 @@ export class GameEngine {
     const p = this.player;
 
     this.enemies.forEach((e) => {
-      if (e.type === 'GLITCH_CAR') {
+      if (e.type === 'VIRUS') {
+        if (e.hp > 0) this.updateVirus(e, dt);
+      } else if (e.type === 'GLITCH_CAR') {
         e.x += e.vx * dt;
       } else if (e.type === 'SPAM_BOT') {
         // Flanking & Zig-Zag chasing
@@ -921,6 +1019,10 @@ export class GameEngine {
     });
 
     this.enemies = this.enemies.filter((e) => {
+      if (e.type === 'VIRUS') {
+        if (e.hp <= 0) this.puffVirus(e);
+        return e.hp > 0;
+      }
       if (e.type === 'GLITCH_CAR') {
         return e.x > -160 && e.x < WORLD_WIDTH + 160;
       }
@@ -1104,6 +1206,7 @@ export class GameEngine {
 
     this.projectiles = this.projectiles.filter(
       (p) =>
+        !(p.type === 'VIRUS_ORB' && isSceneryBlocked(this.stage, p.x, p.y)) &&
         p.life < p.maxLife &&
         p.x >= -80 &&
         p.x <= WORLD_WIDTH + 80 &&
@@ -1137,7 +1240,17 @@ export class GameEngine {
       if (!proj.fromPlayer) return;
 
       this.enemies.forEach((enemy) => {
-        if (enemy.hp <= 0) return;
+        if (enemy.hp <= 0 || proj.life >= proj.maxLife) return;
+        if (enemy.type === 'VIRUS') {
+          const b = virusBox(enemy.x, enemy.y);
+          const nx = Math.max(b.left, Math.min(b.right, proj.x));
+          const ny = Math.max(b.top, Math.min(b.bottom, proj.y));
+          if ((proj.x - nx) ** 2 + (proj.y - ny) ** 2 < proj.radius ** 2) {
+            proj.life = proj.maxLife;
+            this.hitVirus(enemy);
+          }
+          return;
+        }
         const dist = Math.hypot(enemy.x - proj.x, enemy.y - proj.y);
         if (dist < enemy.width / 2 + proj.radius) {
           enemy.hp -= proj.damage;
@@ -1177,6 +1290,11 @@ export class GameEngine {
       if (proj.fromPlayer) return;
       if (p.invincibleTimer > 0) return;
 
+      if (proj.type === 'VIRUS_ORB') {
+        // Virus ball: one life via the shared hit effect, then the ball is gone.
+        if (heroOverlapsCircle(p, proj.x, proj.y, proj.radius) && this.hitHero()) proj.life = proj.maxLife;
+        return;
+      }
       if (heroOverlapsCircle(p, proj.x, proj.y, proj.radius) && this.hitHero()) {
         p.battery = Math.max(0, p.battery - BATTERY_DRAIN_ON_HIT);
         proj.life = proj.maxLife;
@@ -1188,6 +1306,12 @@ export class GameEngine {
 
     this.enemies.forEach((enemy) => {
       if (p.invincibleTimer > 0) return;
+      if (enemy.type === 'VIRUS') {
+        // Touching a Virus body costs one life (1 s immunity from hitHero).
+        const b = virusBox(enemy.x, enemy.y);
+        if (enemy.hp > 0 && heroOverlapsBox(p, b.cx, b.cy, b.w, b.h)) this.hitHero();
+        return;
+      }
 
       if (heroOverlapsBox(p, enemy.x, enemy.y, enemy.width, enemy.height) && this.hitHero()) {
         const damage = enemy.type === 'GLITCH_CAR' ? 30 : 16;
@@ -1378,8 +1502,9 @@ export class GameEngine {
     this.addTextParticle(CANVAS_WIDTH / 2, CANVAS_HEIGHT / 2, reason, '#ef4444');
   }
 
-  private triggerVictory() {
-    this.gameState = 'VICTORY';
+  public triggerVictory() {
+    // In the campaign, beating the boss completes Level 3 (the final level).
+    this.gameState = CAMPAIGN_STAGES.includes(this.stage) ? 'LEVEL_COMPLETE' : 'VICTORY';
     this.packagesDelivered += 1;
     sound.playVictory();
   }

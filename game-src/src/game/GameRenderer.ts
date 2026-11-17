@@ -1,5 +1,6 @@
 import { Player, Enemy, Boss, Projectile, Particle, PowerUp, Shockwave, CaptchaZone, GameSettings } from '../types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, easeInOutSine } from './constants';
+import { trimSprite, usesAttackImage, virusBox, virusLift, VIRUS_HEIGHT, VIRUS_IMAGES, type TrimmedSprite } from './virus';
 import { backgroundUrl, hasImageBackground, LEVEL1_STAGE, LEVEL2_STAGE, LEVEL3_STAGE } from './levelScenery';
 import { HERO_IMAGES, heroAnimationFrame } from './hero';
 
@@ -9,6 +10,8 @@ export class GameRenderer {
   public stage: string = '';
   private backgrounds = new Map<string, HTMLImageElement>();
   private heroImages = new Map<string, HTMLImageElement>();
+  // Virus sprites, trimmed to visible pixels once each image loads.
+  private virusSprites: { run?: TrimmedSprite; attack?: TrimmedSprite } = {};
   private heroLastPosition: { x: number; y: number } | null = null;
   private heroLastTime = 0;
   private heroRunTime = 0;
@@ -21,7 +24,12 @@ export class GameRenderer {
       image.src = url;
       this.heroImages.set(frame, image);
     }
-    for (const stage of [LEVEL1_STAGE, LEVEL2_STAGE, LEVEL3_STAGE]) {
+    for (const [key, url] of Object.entries(VIRUS_IMAGES) as ['run' | 'attack', string][]) {
+      const image = new Image();
+      image.onload = () => { this.virusSprites[key] = trimSprite(image); };
+      image.src = url;
+    }
+    for (const stage of [LEVEL1_STAGE, LEVEL2_STAGE, LEVEL3_STAGE, 'STAGE_BOSS']) {
       const url = backgroundUrl(stage);
       if (!url) continue;
       const image = new Image();
@@ -689,10 +697,54 @@ export class GameRenderer {
     ctx.restore();
   }
 
+  // Virus: one shared scale (run image = 48 px tall), feet-centered, flipped when facing left.
+  private renderVirus(enemy: Enemy) {
+    const v = enemy.virus;
+    const { run, attack } = this.virusSprites;
+    if (!v || !run) return;
+    const ctx = this.ctx;
+    const sprite = usesAttackImage(v.phase) && attack ? attack : run;
+    const scale = VIRUS_HEIGHT / run.height;
+    const w = sprite.width * scale;
+    const h = sprite.height * scale;
+    // Soft dark oval shadow, half as wide as the enemy is tall.
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
+    ctx.beginPath();
+    ctx.ellipse(enemy.x, enemy.y, VIRUS_HEIGHT / 4, VIRUS_HEIGHT / 12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    const shake = v.phase === 'warning' ? (Math.floor(v.phaseTimer * 40) % 2 ? 2 : -2) : 0;
+    const lift = v.phase === 'move' || v.phase === 'recover' ? virusLift(v) : 0;
+    ctx.save();
+    ctx.translate(enemy.x + shake, enemy.y - lift);
+    if (v.facingLeft) ctx.scale(-1, 1);
+    if (v.phase === 'strike') ctx.rotate(-6 * Math.PI / 180); // lean back while firing
+    // Warning glow: a quick white halo so the player sees the attack coming.
+    if (v.phase === 'warning') { ctx.shadowColor = '#ffffff'; ctx.shadowBlur = 16 * (1 - v.phaseTimer / 0.4) + 6; }
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(sprite.canvas, -sprite.footX * scale, -h, w, h);
+    ctx.restore();
+
+    // Hit flash: tint the body white for 0.15 s.
+    if (v.flashTimer > 0) {
+      const b = virusBox(enemy.x, enemy.y - lift);
+      ctx.save();
+      ctx.globalAlpha = 0.75;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.ellipse(b.cx, b.cy, b.w * 0.8, b.h * 0.55, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+  }
+
   private renderEnemies(enemies: Enemy[], motionBlur: boolean) {
     const ctx = this.ctx;
 
     enemies.forEach((enemy) => {
+      if (enemy.type === 'VIRUS') { this.renderVirus(enemy); return; }
       ctx.save();
       ctx.translate(enemy.x, enemy.y);
 
@@ -1045,7 +1097,15 @@ export class GameRenderer {
       ctx.save();
       ctx.translate(p.x, p.y);
 
-      if (p.type === 'WIFI_PULSE') {
+      if (p.type === 'VIRUS_ORB') {
+        // Glowing 12 px Virus ball.
+        ctx.shadowColor = p.color;
+        ctx.shadowBlur = 14;
+        ctx.fillStyle = p.color;
+        ctx.beginPath();
+        ctx.arc(0, 0, p.radius, 0, Math.PI * 2);
+        ctx.fill();
+      } else if (p.type === 'WIFI_PULSE') {
         const angle = Math.atan2(p.vy, p.vx);
         ctx.rotate(angle);
 
@@ -1133,6 +1193,11 @@ export class GameRenderer {
         ctx.moveTo(0, -pt.size);
         ctx.lineTo(0, pt.size);
         ctx.stroke();
+      } else if (pt.shape === 'smoke') {
+        // Smoke circle grows as it fades.
+        ctx.beginPath();
+        ctx.arc(0, 0, (pt.size / 2) * (1 + progress * 1.5), 0, Math.PI * 2);
+        ctx.fill();
       } else if (pt.shape === 'circle') {
         ctx.beginPath();
         ctx.arc(0, 0, pt.size / 2, 0, Math.PI * 2);
