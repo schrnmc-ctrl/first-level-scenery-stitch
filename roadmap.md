@@ -1,3 +1,4 @@
+- [ ] Replace Level 2 enemies with Malware and Level 3 boss with Null plus Malware; Null shield takes 10 shots before 20 health hits; preserve Level 1, scenery and campaign screens; test combat and victory.
 - [x] Animate the hero with both loaded run frames during movement and idle when stationary; 10 hero tests passed and live Level 1 drawing confirmed both run frames and idle on stopping without browser errors.
 - [x] Add supplied idle hero and preload run frames, preserving spawn/scenery/screens; 18 tests passed and live campaign entry, movement, three lives, H immunity and game over verified without browser errors.
 - [x] Add title, story, map, upgrades and victory screens with supplied images and centralized settings.
