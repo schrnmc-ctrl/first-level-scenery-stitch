@@ -5,4 +5,4 @@
 - [x] Apply the supplied background exclusively to Level 2 with static scenery, readable gameplay, and matching object boundaries.
 - [x] Verify Level 1 remains unchanged and Level 2 is playable; provide the updated game ZIP. Level 2 checked directly in live gameplay; normal Level 1 progression was not completed during testing.
 - [x] Replace Level 1 and Level 2 scenery and add the supplied Level 3 scenery exclusively to Level 3.
-- [x] Align scenery boundaries and verify each level renders its own image without changing other stages. Nine scenery tests passed; all three levels visually checked through direct live stage initialization, not full campaign progression.
+- [x] Align scenery boundaries and verify each level renders its own image without changing other stages. Nine scenery tests passed; all three levels visually checked through direct live stage initialization, not full campaign progression.- [x] Replace all Level 1 enemies with the Virus; remove H key; make Level 3 the final boss level. Level 1 Virus chase/attack seen live; boss level not played through.
