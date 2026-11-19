@@ -177,7 +177,8 @@ export default function App() {
           engine.settings.motionBlur,
           engine.mousePos,
           engine.settings,
-          engine.camera
+          engine.camera,
+          engine.combatShakeTimer
         );
       }
 

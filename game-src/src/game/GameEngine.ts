@@ -1,3 +1,4 @@
+import { COMBAT_RULES, ENEMY_PALETTE, combatWidth, combatBox, createCombatState, stepCombatAttack, applyCombatHit, type CombatKind } from './malware';
 import {
   createVirusState, stepVirusAttack, virusBox, VIRUS_BALL_COLOR, VIRUS_BALL_LIFE, VIRUS_BALL_RADIUS,
   VIRUS_BALL_SPEED, VIRUS_FLASH, VIRUS_HEIGHT, VIRUS_HIT_IMMUNITY, VIRUS_MAX, VIRUS_MIN_SPAWN_DISTANCE,
@@ -52,6 +53,8 @@ export class GameEngine {
   public stage: StageId = 'STAGE_1_CROSSWALK';
   public gameState: GameState = 'MENU';
   public stageTimer: number = 0;
+  public combatShakeTimer = 0;
+  private malwareSpawnTimer = 1;
   public glitchIntensity: number = 0;
   public activeCaptcha: CaptchaChallenge | null = null;
   public solvedCaptchasCount: number = 0;
@@ -284,6 +287,9 @@ export class GameEngine {
     this.enemies = [];
     this.projectiles = [];
     this.captchaZones = [];
+    this.boss = null;
+    this.malwareSpawnTimer = 1;
+    this.combatShakeTimer = 0;
 
     if (stageId === 'STAGE_1_CROSSWALK') {
       const spawn = sceneryGateCenter(stageId, 0);
@@ -318,24 +324,13 @@ export class GameEngine {
   }
 
   public initBoss() {
+    const spot = this.findCombatSpot('NULL');
+    if (!spot) return;
     this.boss = {
-      x: WORLD_WIDTH / 2,
-      y: 360,
-      width: 150,
-      height: 110,
-      hp: 1600,
-      maxHp: 1600,
-      phase: 1,
-      shieldActive: true,
-      shieldAngle: 0,
-      shieldCooldown: 0,
-      shieldMaxCooldown: 5.0,
-      shieldDuration: 10.0,
-      laserAngle: Math.PI / 2,
-      laserCharging: false,
-      laserFiring: false,
-      laserTimer: 0,
-      attackTimer: 0,
+      ...spot, width: combatWidth('NULL'), height: 140, hp: 20, maxHp: 20,
+      combat: createCombatState('NULL'), phase: 1, shieldActive: true, shieldAngle: 0,
+      shieldCooldown: 0, shieldMaxCooldown: 0, shieldDuration: 0, laserAngle: 0,
+      laserCharging: false, laserFiring: false, laserTimer: 0, attackTimer: 0,
       glitchOffset: { x: 0, y: 0 },
     };
   }
@@ -355,6 +350,7 @@ export class GameEngine {
       this.stageTimer += deltaTime;
     }
 
+    this.combatShakeTimer = Math.max(0, this.combatShakeTimer - deltaTime);
     this.updatePlayer(deltaTime);
 
     // Smooth Camera Tracker (Lerp camera towards centering the player)
@@ -568,6 +564,7 @@ export class GameEngine {
     this.enemies.forEach((enemy) => {
       const dist = Math.hypot(enemy.x - p.x, enemy.y - p.y);
       if (dist < 200) {
+        if (enemy.type === 'MALWARE') { this.hitCombat(enemy, 'MALWARE'); return; }
         const pushAngle = Math.atan2(enemy.y - p.y, enemy.x - p.x);
         enemy.x += Math.cos(pushAngle) * 110;
         enemy.y += Math.sin(pushAngle) * 110;
@@ -576,6 +573,8 @@ export class GameEngine {
         this.addTextParticle(enemy.x, enemy.y, 'BLAST!', '#38bdf8');
       }
     });
+
+    if (this.boss && Math.hypot(this.boss.x - p.x, this.boss.y - p.y) < 200) this.hitCombat(this.boss, 'NULL');
 
     this.projectiles = this.projectiles.filter((proj) => {
       if (!proj.fromPlayer) {
@@ -614,13 +613,16 @@ export class GameEngine {
         this.virusSpawnTimer = 1.2 + Math.random() * 2.3; // random cadence
         this.spawnVirus();
       }
+    } else if (this.stage === LEVEL2_STAGE || this.stage === 'STAGE_BOSS') {
+      this.malwareSpawnTimer -= dt;
+      if (this.malwareSpawnTimer <= 0) { this.malwareSpawnTimer = 1.2 + Math.random() * 2.3; this.spawnMalware(); }
     } else {
     this.spawnCarTimer += dt;
     if (this.spawnCarTimer >= effectiveCarInterval) {
       this.spawnCarTimer = 0;
       this.spawnGlitchCar(diffMul);
       if (Math.random() < 0.28 * diffMul) {
-        setTimeout(() => this.spawnGlitchCar(diffMul), 400);
+        setTimeout(() => { if (this.stage === LEVEL3_STAGE && this.gameState === 'PLAYING') this.spawnGlitchCar(diffMul); }, 400);
       }
     }
 
@@ -652,7 +654,7 @@ export class GameEngine {
   private virusSpotFree(x: number, y: number, self?: Enemy) {
     const b = virusBox(x, y);
     const corners = [[b.left, b.top], [b.right, b.top], [b.left, b.bottom], [b.right, b.bottom]];
-    if (corners.some(([cx, cy]) => isSceneryBlocked(this.stage, cx!, cy!))) return false;
+    if (corners.some(([cx, cy]) => isSceneryBlocked(this.stage, cx ?? 0, cy ?? 0))) return false;
     return !this.enemies.some((o) => o !== self && o.type === 'VIRUS' && o.hp > 0 &&
       Math.abs(o.x - x) < b.w && Math.abs(o.y - y) < b.h);
   }
@@ -675,7 +677,8 @@ export class GameEngine {
 
   // Chase straight at the hero; stop and run the 3-step attack when in range.
   private updateVirus(e: Enemy, dt: number) {
-    const v = e.virus!;
+    const v = e.virus;
+    if (!v) return;
     const p = this.player;
     v.age += dt;
     v.flashTimer = Math.max(0, v.flashTimer - dt);
@@ -705,7 +708,8 @@ export class GameEngine {
 
   // Hero shot: white flash, floating "-1", 0.3 s before it can be hit again.
   private hitVirus(e: Enemy) {
-    const v = e.virus!;
+    const v = e.virus;
+    if (!v) return;
     if (v.hitImmunity > 0) return;
     v.hitImmunity = VIRUS_HIT_IMMUNITY;
     v.flashTimer = VIRUS_FLASH;
@@ -914,7 +918,9 @@ export class GameEngine {
     const p = this.player;
 
     this.enemies.forEach((e) => {
-      if (e.type === 'VIRUS') {
+      if (e.type === 'MALWARE') {
+        this.updateCombat(e, dt, 'MALWARE');
+      } else if (e.type === 'VIRUS') {
         if (e.hp > 0) this.updateVirus(e, dt);
       } else if (e.type === 'GLITCH_CAR') {
         e.x += e.vx * dt;
@@ -1019,7 +1025,10 @@ export class GameEngine {
     });
 
     this.enemies = this.enemies.filter((e) => {
-      if (e.type === 'VIRUS') {
+      if (e.type === 'MALWARE') return e.combat?.deathTimer === null || (e.combat?.deathTimer ?? 1) < 1;
+      if (e.type === 'MALWARE') {
+        this.updateCombat(e, dt, 'MALWARE');
+      } else if (e.type === 'VIRUS') {
         if (e.hp <= 0) this.puffVirus(e);
         return e.hp > 0;
       }
@@ -1030,171 +1039,86 @@ export class GameEngine {
     });
   }
 
+  // Body-box placement checks walls and every live combatant before spawning or moving.
+  private combatSpotFree(x: number, y: number, width: number, height: number, self?: Enemy | Boss) {
+    const b = combatBox({ x, y, width, height });
+    for (const cx of [b.left, x, b.right]) for (const cy of [b.top, b.cy, b.bottom]) {
+      if (isSceneryBlocked(this.stage, cx, cy)) return false;
+    }
+    const others: (Enemy | Boss)[] = [...this.enemies];
+    if (this.boss) others.push(this.boss);
+    return !others.some(o => {
+      if (o === self || o.hp <= 0) return false;
+      const box = combatBox(o);
+      return b.left < box.right && b.right > box.left && b.top < box.bottom && b.bottom > box.top;
+    });
+  }
+
+  private findCombatSpot(kind: CombatKind) {
+    const width = combatWidth(kind), height = COMBAT_RULES[kind].height;
+    for (let i = 0; i < 400; i++) {
+      const x = 40 + Math.random() * (WORLD_WIDTH - 80), y = height + Math.random() * (WORLD_HEIGHT - height - 40);
+      if (Math.hypot(x - this.player.x, y - this.player.y) >= 200 && this.combatSpotFree(x, y, width, height)) return { x, y };
+    }
+    // Deterministic fallback ensures the unique boss cannot silently fail to spawn.
+    for (let y = height; y < WORLD_HEIGHT; y += 25) for (let x = 40; x < WORLD_WIDTH; x += 25) {
+      if (Math.hypot(x - this.player.x, y - this.player.y) >= 200 && this.combatSpotFree(x, y, width, height)) return { x, y };
+    }
+    return undefined;
+  }
+
+  private spawnMalware() {
+    if (this.enemies.length >= 6) return;
+    const spot = this.findCombatSpot('MALWARE');
+    if (!spot) return;
+    this.enemies.push({ ...spot, id: Math.random().toString(), type: 'MALWARE', width: combatWidth('MALWARE'), height: 96,
+      vx: 0, vy: 0, hp: 3, maxHp: 3, color: ENEMY_PALETTE.main, iconType: 'bot', combat: createCombatState('MALWARE') });
+  }
+
+  private updateCombat(e: Enemy | Boss, dt: number, kind: CombatKind) {
+    const v = e.combat;
+    if (!v) return;
+    if (v.deathTimer !== null) { v.deathTimer += dt; return; }
+    v.age += dt; v.flashTimer = Math.max(0, v.flashTimer - dt); v.hitImmunity = Math.max(0, v.hitImmunity - dt);
+    const b = combatBox(e), dx = this.player.x - b.cx, dy = this.player.y - b.cy, dist = Math.hypot(dx, dy);
+    if (dx !== 0) v.facingLeft = dx < 0;
+    const rule = COMBAT_RULES[kind];
+    if (stepCombatAttack(v, dt, dist, kind)) {
+      this.projectiles.push({ id: Math.random().toString(), x: b.cx, y: b.cy,
+        vx: dx / (dist || 1) * 220 * rule.attackScale, vy: dy / (dist || 1) * 220 * rule.attackScale,
+        radius: 6 * rule.attackScale, color: ENEMY_PALETTE.main, damage: 0, fromPlayer: false,
+        life: 0, maxLife: 2, type: kind === 'NULL' ? 'NULL_ORB' : 'MALWARE_ORB' });
+    }
+    v.moving = false;
+    if (rule.stationary || v.phase !== 'move' || dist <= 200 * rule.attackScale) return;
+    const sx = dx / dist * rule.speed * dt, sy = dy / dist * rule.speed * dt;
+    if (this.combatSpotFree(e.x + sx, e.y, e.width, e.height, e)) { e.x += sx; v.moving = true; }
+    if (this.combatSpotFree(e.x, e.y + sy, e.width, e.height, e)) { e.y += sy; v.moving = true; }
+  }
+
+  private hitCombat(e: Enemy | Boss, kind: CombatKind) {
+    if (!applyCombatHit(e)) return;
+    if (kind === 'NULL') {
+      this.combatShakeTimer = 0.1;
+      if (this.boss) this.boss.shieldActive = (e.combat?.shieldHits ?? 0) > 0;
+    } else {
+      const b = combatBox(e);
+      this.particles.push({ x: b.cx, y: b.cy, vx: 0, vy: 0, size: 12, color: ENEMY_PALETTE.star, life: 0.2, maxLife: 0.2, shape: 'spark' });
+    }
+    if (e.hp <= 0) { this.enemiesDefeatedCount++; this.player.score += kind === 'NULL' ? 5000 : 110; sound.playBotExplode(); }
+  }
+
   private updateBoss(dt: number) {
     const boss = this.boss;
     if (!boss) return;
-
-    boss.shieldAngle += dt * 2.1;
-
-    if (boss.shieldActive) {
-      boss.shieldDuration -= dt;
-      if (boss.shieldDuration <= 0) {
-        boss.shieldActive = false;
-        boss.shieldCooldown = boss.shieldMaxCooldown;
-        this.addTextParticle(boss.x, boss.y - 40, '⚡ SHIELD OVERHEAT! FIRE NOW! ⚡', '#ef4444');
-        this.glitchIntensity = 0.6;
-        sound.playBossAlarm();
-      }
-    } else {
-      boss.shieldCooldown -= dt;
-      if (boss.shieldCooldown <= 0) {
-        boss.shieldActive = true;
-        boss.shieldDuration = 10.0;
-        this.addTextParticle(boss.x, boss.y - 40, '🛡️ CHECKMARK SHIELDS RESTORED', '#10b981');
-      }
+    this.updateCombat(boss, dt, 'NULL');
+    if (boss.combat?.deathTimer !== null && (boss.combat?.deathTimer ?? 0) >= 1) {
+      this.boss = null; this.projectiles = []; this.enemies = []; this.triggerVictory();
     }
+  }
 
-    boss.attackTimer += dt;
-    if (boss.attackTimer >= 1.8) {
-      boss.attackTimer = 0;
-
-      const projectileCount = 14;
-      const chars = ['K9', '7X', '4M', 'W3', 'R2', '9Q', 'V8'];
-      for (let i = 0; i < projectileCount; i++) {
-        const angle = (i * Math.PI * 2) / projectileCount + boss.shieldAngle;
-        this.projectiles.push({
-          id: Math.random().toString(),
-          x: boss.x,
-          y: boss.y,
-          vx: Math.cos(angle) * 190,
-          vy: Math.sin(angle) * 190,
-          radius: 8,
-          color: '#ec4899',
-          damage: 14,
-          fromPlayer: false,
-          life: 0,
-          maxLife: 4.0,
-          type: 'CAPTCHA_CHAR',
-          charText: chars[i % chars.length],
-        });
-      }
-    }
-
-    boss.laserTimer += dt;
-    if (boss.laserTimer > 6.5 && !boss.laserCharging && !boss.laserFiring) {
-      boss.laserCharging = true;
-      boss.laserAngle = Math.atan2(this.player.y - boss.y, this.player.x - boss.x);
-      sound.playCarWarning();
-    } else if (boss.laserCharging && boss.laserTimer > 8.0) {
-      boss.laserCharging = false;
-      boss.laserFiring = true;
-      sound.playBossAlarm();
-    } else if (boss.laserFiring) {
-      boss.laserAngle += dt * 1.0;
-      if (boss.laserTimer > 11.0) {
-        boss.laserFiring = false;
-        boss.laserTimer = 0;
-      }
-
-      const p = this.player;
-      const angleToPlayer = Math.atan2(p.y - boss.y, p.x - boss.x);
-      const angleDiff = Math.abs(
-        Math.atan2(Math.sin(angleToPlayer - boss.laserAngle), Math.cos(angleToPlayer - boss.laserAngle))
-      );
-      if (angleDiff < 0.14 && this.hitHero()) {
-        p.battery = Math.max(0, p.battery - 24);
-        this.glitchIntensity = 0.8;
-        sound.playHit();
-        this.addTextParticle(p.x, p.y, 'VERIFICATION LASER HIT! -24%', '#ef4444');
-      }
-    }
-
-    if (Math.random() < 0.2) {
-      boss.glitchOffset = {
-        x: (Math.random() - 0.5) * 6,
-        y: (Math.random() - 0.5) * 6,
-      };
-    } else {
-      boss.glitchOffset = { x: 0, y: 0 };
-    }
-
-    if (boss.hp <= 0 || boss.isDefeated) {
-      if (!boss.isDefeated) {
-        boss.isDefeated = true;
-        boss.defeatTimer = 0;
-        this.gameState = 'BOSS_DEFEAT_CINEMATIC';
-        this.enemies = [];
-        this.projectiles = this.projectiles.filter((p) => p.fromPlayer);
-        this.player.score += 5000;
-        sound.playBossCoreMeltdown();
-        this.addTextParticle(boss.x, boss.y - 40, '⚠ CORE OVERLOAD INITIATED ⚠', '#ef4444');
-      }
-
-      boss.defeatTimer = (boss.defeatTimer || 0) + dt;
-
-      // Cascading secondary explosion arcs across boss chassis
-      if (Math.random() < 0.5) {
-        const offX = boss.x + (Math.random() - 0.5) * boss.width * 0.9;
-        const offY = boss.y + (Math.random() - 0.5) * boss.height * 0.9;
-        this.createExplosion(offX, offY, Math.random() > 0.5 ? '#f43f5e' : '#f59e0b', 6);
-        this.shockwaves.push({
-          x: offX,
-          y: offY,
-          radius: 4,
-          maxRadius: 70 + Math.random() * 50,
-          duration: 0.45,
-          timer: 0,
-        });
-      }
-
-      // Shard bursts tearing off the boss
-      if (Math.random() < 0.35) {
-        const angle = Math.random() * Math.PI * 2;
-        this.particles.push({
-          x: boss.x + (Math.random() - 0.5) * 40,
-          y: boss.y + (Math.random() - 0.5) * 40,
-          vx: Math.cos(angle) * (90 + Math.random() * 140),
-          vy: Math.sin(angle) * (90 + Math.random() * 140),
-          size: 8 + Math.random() * 14,
-          color: '#09090b',
-          life: 0.8,
-          maxLife: 0.8,
-          shape: 'shard',
-          rotation: angle,
-          vRot: (Math.random() - 0.5) * 10,
-        });
-      }
-
-      if (boss.defeatTimer >= 3.8) {
-        // Final catastrophic shockwave & celebratory spark burst
-        this.shockwaves.push({
-          x: boss.x,
-          y: boss.y,
-          radius: 10,
-          maxRadius: 380,
-          duration: 1.0,
-          timer: 0,
-        });
-        for (let i = 0; i < 40; i++) {
-          const a = (i * Math.PI * 2) / 40;
-          this.particles.push({
-            x: boss.x,
-            y: boss.y,
-            vx: Math.cos(a) * 240,
-            vy: Math.sin(a) * 240,
-            size: 6,
-            color: i % 2 === 0 ? '#10b981' : '#09090b',
-            life: 1.4,
-            maxLife: 1.4,
-            shape: 'spark',
-            rotation: a,
-            vRot: 4,
-          });
-        }
-        this.triggerVictory();
-      }
-      return;
-    }
+  private orbHitsWall(p: Projectile) {
+    return [[0,0],[-p.radius,0],[p.radius,0],[0,-p.radius],[0,p.radius]].some(([dx,dy]) => isSceneryBlocked(this.stage, p.x + (dx ?? 0), p.y + (dy ?? 0)));
   }
 
   private updateProjectiles(dt: number) {
@@ -1206,7 +1130,7 @@ export class GameEngine {
 
     this.projectiles = this.projectiles.filter(
       (p) =>
-        !(p.type === 'VIRUS_ORB' && isSceneryBlocked(this.stage, p.x, p.y)) &&
+        !(['VIRUS_ORB', 'MALWARE_ORB', 'NULL_ORB'].includes(p.type) && this.orbHitsWall(p)) &&
         p.life < p.maxLife &&
         p.x >= -80 &&
         p.x <= WORLD_WIDTH + 80 &&
@@ -1241,6 +1165,11 @@ export class GameEngine {
 
       this.enemies.forEach((enemy) => {
         if (enemy.hp <= 0 || proj.life >= proj.maxLife) return;
+        if (enemy.type === 'MALWARE') {
+          const b = combatBox(enemy), nx = Math.max(b.left, Math.min(b.right, proj.x)), ny = Math.max(b.top, Math.min(b.bottom, proj.y));
+          if ((proj.x - nx) ** 2 + (proj.y - ny) ** 2 < proj.radius ** 2) { proj.life = proj.maxLife; this.hitCombat(enemy, 'MALWARE'); }
+          return;
+        }
         if (enemy.type === 'VIRUS') {
           const b = virusBox(enemy.x, enemy.y);
           const nx = Math.max(b.left, Math.min(b.right, proj.x));
@@ -1263,31 +1192,22 @@ export class GameEngine {
         }
       });
 
-      if (this.boss && this.boss.hp > 0) {
-        const boss = this.boss;
-        const distToBoss = Math.hypot(boss.x - proj.x, boss.y - proj.y);
-
-        if (boss.shieldActive && distToBoss < 135) {
-          proj.life = proj.maxLife;
-          this.createExplosion(proj.x, proj.y, '#10b981', 6);
-          sound.playShieldDeflect();
-          this.addTextParticle(proj.x, proj.y, 'BLOCKED BY ✓ SHIELD', '#10b981');
-          return;
-        }
-
-        if (!boss.shieldActive && distToBoss < boss.width / 2 + 10) {
-          boss.hp -= proj.damage;
-          proj.life = proj.maxLife;
-          p.score += 85;
-          this.createExplosion(proj.x, proj.y, '#ef4444', 8);
-          this.addTextParticle(proj.x, proj.y, `-${proj.damage}`, '#f87171');
-          sound.playBotExplode();
+      if (this.boss && this.boss.hp > 0 && proj.life < proj.maxLife) {
+        const boss = this.boss, box = combatBox(boss);
+        const nx = Math.max(box.left, Math.min(box.right, proj.x)), ny = Math.max(box.top, Math.min(box.bottom, proj.y));
+        if ((proj.x - nx) ** 2 + (proj.y - ny) ** 2 < proj.radius ** 2) {
+          proj.life = proj.maxLife; this.hitCombat(boss, 'NULL');
         }
       }
     });
 
     this.projectiles.forEach((proj) => {
       if (proj.fromPlayer) return;
+      if (proj.life >= proj.maxLife) return;
+      if (['VIRUS_ORB', 'MALWARE_ORB', 'NULL_ORB'].includes(proj.type)) {
+        if (heroOverlapsCircle(p, proj.x, proj.y, proj.radius)) { this.hitHero(); proj.life = proj.maxLife; }
+        return;
+      }
       if (p.invincibleTimer > 0) return;
 
       if (proj.type === 'VIRUS_ORB') {
@@ -1306,6 +1226,11 @@ export class GameEngine {
 
     this.enemies.forEach((enemy) => {
       if (p.invincibleTimer > 0) return;
+      if (enemy.type === 'MALWARE') {
+        const b = combatBox(enemy);
+        if (enemy.hp > 0 && heroOverlapsBox(p, b.cx, b.cy, b.w, b.h)) this.hitHero();
+        return;
+      }
       if (enemy.type === 'VIRUS') {
         // Touching a Virus body costs one life (1 s immunity from hitHero).
         const b = virusBox(enemy.x, enemy.y);
@@ -1321,6 +1246,8 @@ export class GameEngine {
         this.addTextParticle(p.x, p.y, `HAZARD HIT! -${damage}%`, '#ef4444');
       }
     });
+
+    if (this.boss && this.boss.hp > 0) { const b = combatBox(this.boss); if (heroOverlapsBox(p, b.cx, b.cy, b.w, b.h)) this.hitHero(); }
 
     this.powerUps = this.powerUps.filter((pup) => {
       const dist = Math.hypot(p.x - (pup.x + pup.width / 2), p.y - (pup.y + pup.height / 2));
@@ -1435,6 +1362,7 @@ export class GameEngine {
       this.enemies.forEach((enemy) => {
         const dist = Math.hypot(enemy.x - this.player.x, enemy.y - this.player.y);
         if (dist < 180) {
+          if (enemy.type === 'MALWARE') { this.hitCombat(enemy, 'MALWARE'); return; }
           const pushAngle = Math.atan2(enemy.y - this.player.y, enemy.x - this.player.x);
           enemy.x += Math.cos(pushAngle) * 80;
           enemy.y += Math.sin(pushAngle) * 80;
@@ -1467,6 +1395,7 @@ export class GameEngine {
   }
 
   private checkStageProgress() {
+    if (this.stage === 'STAGE_BOSS') return; // Only defeating Null finishes the final level.
     // Campaign levels finish only once every gate is solved, in order.
     if (CAMPAIGN_STAGES.includes(this.stage)) {
       if (allGatesSolved(this.captchaZones) && !this.activeCaptcha) {

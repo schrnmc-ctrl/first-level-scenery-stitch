@@ -58,7 +58,8 @@ export type EnemyType =
   | 'FIRE_HYDRANT_BOT' 
   | 'BICYCLE_DRONE'
   | 'CAPTCHA_TILE_SEEKER'
-  | 'VIRUS'; // Level 1 only enemy
+  | 'VIRUS' // Level 1 only enemy
+  | 'MALWARE'; // The only base enemy in Levels 2 and 3
 
 export interface Enemy {
   id: string;
@@ -77,10 +78,12 @@ export interface Enemy {
   warningTimer?: number;
   direction?: 'LEFT' | 'RIGHT' | 'UP' | 'DOWN';
   virus?: import('./game/virus').VirusState; // Virus-only animation and attack state
+  combat?: import('./game/malware').CombatState;
   iconType: 'crosswalk' | 'car' | 'traffic_light' | 'bot' | 'hydrant' | 'bicycle' | 'bus';
 }
 
 export interface Boss {
+  combat?: import('./game/malware').CombatState;
   x: number;
   y: number;
   width: number;
@@ -115,7 +118,7 @@ export interface Projectile {
   fromPlayer: boolean;
   life: number;
   maxLife: number;
-  type: 'WIFI_PULSE' | 'GLITCH_DATA' | 'CAPTCHA_CHAR' | 'BOSS_LASER_ORB' | 'VIRUS_ORB';
+  type: 'WIFI_PULSE' | 'GLITCH_DATA' | 'CAPTCHA_CHAR' | 'BOSS_LASER_ORB' | 'VIRUS_ORB' | 'MALWARE_ORB' | 'NULL_ORB';
   charText?: string;
 }
 

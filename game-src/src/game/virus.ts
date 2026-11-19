@@ -95,12 +95,15 @@ export function findTrim(alpha: (x: number, y: number) => number, width: number,
 export function trimSprite(image: HTMLImageElement): TrimmedSprite {
   const src = document.createElement('canvas');
   src.width = image.naturalWidth; src.height = image.naturalHeight;
-  const sctx = src.getContext('2d')!;
+  const sctx = src.getContext('2d');
+  if (!sctx) throw new Error('Sprite canvas is unavailable');
   sctx.drawImage(image, 0, 0);
   const data = sctx.getImageData(0, 0, src.width, src.height).data;
   const t = findTrim((x, y) => data[(y * src.width + x) * 4 + 3] ?? 0, src.width, src.height);
   const canvas = document.createElement('canvas');
   canvas.width = t.w; canvas.height = t.h;
-  canvas.getContext('2d')!.drawImage(src, t.minX, t.minY, t.w, t.h, 0, 0, t.w, t.h);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) throw new Error('Sprite canvas is unavailable');
+  ctx.drawImage(src, t.minX, t.minY, t.w, t.h, 0, 0, t.w, t.h);
   return { canvas, width: t.w, height: t.h, footX: t.footX };
 }

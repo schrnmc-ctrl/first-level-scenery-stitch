@@ -1,3 +1,4 @@
+import { MALWARE_IMAGES, ENEMY_PALETTE, COMBAT_RULES, combatBox, combatDeathPose, type CombatKind } from './malware';
 import { Player, Enemy, Boss, Projectile, Particle, PowerUp, Shockwave, CaptchaZone, GameSettings } from '../types';
 import { CANVAS_WIDTH, CANVAS_HEIGHT, WORLD_WIDTH, WORLD_HEIGHT, easeInOutSine } from './constants';
 import { trimSprite, usesAttackImage, virusBox, virusLift, VIRUS_HEIGHT, VIRUS_IMAGES, type TrimmedSprite } from './virus';
@@ -12,6 +13,7 @@ export class GameRenderer {
   private heroImages = new Map<string, HTMLImageElement>();
   // Virus sprites, trimmed to visible pixels once each image loads.
   private virusSprites: { run?: TrimmedSprite; attack?: TrimmedSprite } = {};
+  private combatSprites: { run?: TrimmedSprite; attack?: TrimmedSprite } = {};
   private heroLastPosition: { x: number; y: number } | null = null;
   private heroLastTime = 0;
   private heroRunTime = 0;
@@ -27,6 +29,11 @@ export class GameRenderer {
     for (const [key, url] of Object.entries(VIRUS_IMAGES) as ['run' | 'attack', string][]) {
       const image = new Image();
       image.onload = () => { this.virusSprites[key] = trimSprite(image); };
+      image.src = url;
+    }
+    for (const [key, url] of Object.entries(MALWARE_IMAGES) as ['run' | 'attack', string][]) {
+      const image = new Image();
+      image.onload = () => { this.combatSprites[key] = trimSprite(image); };
       image.src = url;
     }
     for (const stage of [LEVEL1_STAGE, LEVEL2_STAGE, LEVEL3_STAGE, 'STAGE_BOSS']) {
@@ -53,7 +60,8 @@ export class GameRenderer {
     motionBlur: boolean = true,
     mousePos: { x: number; y: number } = { x: WORLD_WIDTH / 2, y: WORLD_HEIGHT / 2 },
     settings?: GameSettings,
-    camera: { x: number; y: number } = { x: 0, y: 0 }
+    camera: { x: number; y: number } = { x: 0, y: 0 },
+    combatShakeTimer = 0
   ) {
     this.time = time;
     const ctx = this.ctx;
@@ -72,6 +80,10 @@ export class GameRenderer {
         const offsetX = Math.max(-8, Math.min(8, (Math.random() - 0.5) * clamped * 9));
         const offsetY = Math.max(-8, Math.min(8, (Math.random() - 0.5) * clamped * 9));
         ctx.translate(offsetX, offsetY);
+      }
+
+      if (combatShakeTimer > 0 && shakeMultiplier > 0) {
+        ctx.translate(Math.sin(this.time * 100) * 2, Math.cos(this.time * 110) * 2);
       }
 
       // 1. Subtle Motion Blur & Canvas Clear
@@ -740,10 +752,54 @@ export class GameRenderer {
     }
   }
 
+  // Both poses use the run-image scale and their own feet midpoint, never separate sizing.
+  private renderCombat(e: Enemy | Boss, kind: CombatKind) {
+    const v = e.combat, run = this.combatSprites.run;
+    if (!v || !run) return;
+    const ctx = this.ctx, rule = COMBAT_RULES[kind];
+    const sprite = usesAttackImage(v.phase) && this.combatSprites.attack ? this.combatSprites.attack : run;
+    const scale = rule.height / run.height, w = sprite.width * scale, h = sprite.height * scale;
+    const dead = v.deathTimer !== null;
+    const pose = combatDeathPose(kind, v.deathTimer ?? 0);
+    const lift = !dead && (v.phase === 'move' || v.phase === 'recover') ? 1.5 - 1.5 * Math.cos(v.age * Math.PI * 2 / 1.2) : 0;
+    ctx.save();
+    ctx.fillStyle = ENEMY_PALETTE.shadow; ctx.shadowColor = ENEMY_PALETTE.shadow; ctx.shadowBlur = 5;
+    ctx.beginPath(); ctx.ellipse(e.x, e.y, e.height / 4, e.height / 12, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.restore();
+    ctx.save();
+    const shake = v.phase === 'warning' ? (Math.floor(v.phaseTimer * 40) % 2 ? 2 : -2) * rule.attackScale : 0;
+    ctx.translate(e.x + shake, e.y - lift);
+    if (dead) { ctx.globalAlpha = pose.alpha; ctx.rotate(pose.rotation); ctx.scale(pose.xScale, pose.yScale); }
+    if (v.facingLeft) ctx.scale(-1, 1);
+    if (!dead && v.phase === 'strike') ctx.rotate(-6 * Math.PI / 180);
+    else if (!dead && v.moving) ctx.rotate(8 * Math.PI / 180);
+    if (!dead && v.phase === 'warning') { ctx.shadowColor = ENEMY_PALETTE.white; ctx.shadowBlur = (16 * (1 - v.phaseTimer / 0.4) + 6) * rule.attackScale; }
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(sprite.canvas, -sprite.footX * scale, -h, w, h);
+    ctx.restore();
+    // Effects and health stay upright, independent of sprite flipping and tilting.
+    if (!dead && v.flashTimer > 0) {
+      const b = combatBox(e); ctx.save(); ctx.globalAlpha = 0.65;
+      ctx.fillStyle = kind === 'NULL' ? ENEMY_PALETTE.hit : ENEMY_PALETTE.white;
+      ctx.beginPath(); ctx.ellipse(b.cx, b.cy - lift, b.w / 2, b.h / 2, 0, 0, Math.PI * 2); ctx.fill(); ctx.restore();
+    }
+    if (!dead && kind === 'NULL') {
+      ctx.save();
+      for (let i = 0; i < e.maxHp; i++) { ctx.fillStyle = i < e.hp ? ENEMY_PALETTE.health : ENEMY_PALETTE.empty; ctx.fillRect(e.x - (e.maxHp * 12 - 2) / 2 + i * 12, e.y - e.height - lift - 14, 10, 6); }
+      if (v.shieldHits > 0) {
+        const b = combatBox(e); ctx.strokeStyle = ENEMY_PALETTE.main; ctx.lineWidth = 3; ctx.shadowColor = ENEMY_PALETTE.main; ctx.shadowBlur = 12;
+        ctx.beginPath(); ctx.ellipse(b.cx, b.cy, b.w / 2 + 12, b.h / 2 + 12, 0, 0, Math.PI * 2); ctx.stroke();
+        ctx.font = 'bold 11px monospace'; ctx.textAlign = 'center'; ctx.fillStyle = ENEMY_PALETTE.main; ctx.fillText('SHIELD ' + v.shieldHits, e.x, e.y - e.height - 24);
+      }
+      ctx.restore();
+    }
+  }
+
   private renderEnemies(enemies: Enemy[], motionBlur: boolean) {
     const ctx = this.ctx;
 
     enemies.forEach((enemy) => {
+      if (enemy.type === 'MALWARE') { this.renderCombat(enemy, 'MALWARE'); return; }
       if (enemy.type === 'VIRUS') { this.renderVirus(enemy); return; }
       ctx.save();
       ctx.translate(enemy.x, enemy.y);
@@ -947,6 +1003,7 @@ export class GameRenderer {
   }
 
   private renderBoss(boss: Boss) {
+    if (boss.combat) { this.renderCombat(boss, 'NULL'); return; }
     const ctx = this.ctx;
     ctx.save();
     ctx.translate(boss.x + boss.glitchOffset.x, boss.y + boss.glitchOffset.y);
@@ -1097,7 +1154,7 @@ export class GameRenderer {
       ctx.save();
       ctx.translate(p.x, p.y);
 
-      if (p.type === 'VIRUS_ORB') {
+      if (['VIRUS_ORB', 'MALWARE_ORB', 'NULL_ORB'].includes(p.type)) {
         // Glowing 12 px Virus ball.
         ctx.shadowColor = p.color;
         ctx.shadowBlur = 14;

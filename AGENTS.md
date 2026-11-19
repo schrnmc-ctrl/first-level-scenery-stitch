@@ -14,3 +14,4 @@
 - Keep campaign presentation in `CampaignScreens` with a logical 16:9 canvas, accessible matching controls, and one commented screen CONFIG; App coordinates fades while GameEngine owns gate validation and level completion so gameplay dimensions remain independent.
 - Keep hero assets, sizing, animation frame selection, box collision helpers and life damage rules in the browser-safe `hero` module; GameEngine applies damage and GameRenderer preloads art and tracks displacement for animation so presentation stays independent of campaign screens.
 - Keep Virus art trimming, sizing, attack timing and hitbox rules in the browser-safe `virus` module; the boss stage is campaign Level 3 and reuses Level 3 scenery through `levelScenery`.
+- Keep Malware and Null combat rules in browser-safe `malware`; GameEngine applies shared hit-count damage and GameRenderer shares feet-aligned art without changing Level 1 Virus behavior.
